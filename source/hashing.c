@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <string.h>
-
 #include "hashing.h"
 
 int main(int argc, char* argv[])
@@ -15,12 +12,9 @@ int main(int argc, char* argv[])
 
   printf("%s\n", string);
 
-  char hash[65];
-  memset(hash, '\0', sizeof(char) * 65);
+  char hash[64];
 
-  sha256(hash, string, sizeof(char) * strlen(string));
-
-  printf("%s\n", hash);
+  printf("%s\n", sha256(hash, string, sizeof(char) * strlen(string)));
 
   return 0;
 }
