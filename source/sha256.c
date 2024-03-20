@@ -65,7 +65,7 @@ static void w_create(uint32_t w[64], const uint32_t chunk[16])
 #define SUM1(x) (RROTATE(x, 6) ^ RROTATE(x, 11) ^ RROTATE(x, 25))
 
 // first 32 bits of the fractional parts of the cube roots of the first 64 primes
-const uint32_t k[64] = {
+static const uint32_t k[64] = {
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
   0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
   0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
@@ -205,8 +205,8 @@ static void block_message_prepend(uint32_t* block, const void* message, size_t s
  */
 #define MOD_BITS(SIZE) (((SIZE) & 0b111111) * 8)
 
-#define CHUNKS(SIZE) (EXTRA_CHUNK(SIZE) ? (INIT_CHUNKS(SIZE) + 1) : INIT_CHUNKS(SIZE))
-#define ZEROS(SIZE) (EXTRA_CHUNK(SIZE) ? (959 - MOD_BITS(SIZE)) : (447 - MOD_BITS(SIZE)))
+#define CHUNKS(SIZE) (((SIZE) == 0) ? 1 : (EXTRA_CHUNK(SIZE) ? (INIT_CHUNKS(SIZE) + 1) : INIT_CHUNKS(SIZE)))
+#define ZEROS(SIZE) (((SIZE) == 0) ? 448 : (EXTRA_CHUNK(SIZE) ? (959 - MOD_BITS(SIZE)) : (447 - MOD_BITS(SIZE))))
 
 /*
  * Create the message block needed to generate the SHA256 hash
