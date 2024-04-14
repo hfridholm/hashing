@@ -1,0 +1,37 @@
+.TH HASHING 1 2024-04-14 Linux
+
+.SH NAME
+hashing \- compute hash algorithm checksum
+
+.SH SYNOPSIS
+.B hashing
+[\fIOPTION\fR]... [\fIFILE\fR]...
+
+.SH DESCRIPTION
+.B hashing
+computes the checksum of a file or some input from stdin using the supplied hash algorithm.
+
+.SH OPTIONS
+.TP
+.BR \-a " " \fI <algorithm>
+The hash algorithm to use when computing the checksum.
+
+See \fBALGORITHMS\fR for which hash algorithms is supported.
+
+Note: When no algorithm is supplied, \fBsha256\fR is used.
+
+.SH ALGORITHMS
+.TP
+.BR sha256 " (defualt)"
+SHA256 produces a 256 bit hash, which here is represented by a 64 character hex string.
+
+.TP
+.BR md5
+MD5 produces a 128 bit hash, which here is represented by a 32 character hex string.
+
+.SH AUTHOR
+Written by Hampus Fridholm.
+
+.SH SEE ALSO
+\fBsha256sum\fR(1),
+\fBmd5sum\fR(1)
