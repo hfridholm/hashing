@@ -1,7 +1,9 @@
 #include "hashing.h"
 
 char* algorithm = NULL;
-char* filepath  = NULL;
+
+char** paths;
+size_t pamount = 0;
 
 /*
  * RETURN (int status)
@@ -9,7 +11,7 @@ char* filepath  = NULL;
  * - 1 | No inputted algorithm
  * - 2 | Algorithm not supported
  */
-int algorithm_hash(char* hash, const void* message, size_t size, const char* algorithm)
+int message_hash(char* hash, const void* message, size_t size)
 {
   if(algorithm == NULL) return 1;
 
@@ -30,14 +32,13 @@ int algorithm_hash(char* hash, const void* message, size_t size, const char* alg
  * PARAMS
  * - const void* message   | The message to hash
  * - size_t size           | The amount of bytes (8 bits)
- * - const char* algorithm | The used hash algorithm
  */
-void message_algorithm_hash_print(const void* message, size_t size, const char* algorithm)
+void message_hash_print(const void* message, size_t size)
 {
   char hash[65];
   memset(hash, '\0', sizeof(char) * 65);
 
-  int status = algorithm_hash(hash, message, size, algorithm);
+  int status = message_hash(hash, message, size);
 
   switch(status)
   {
@@ -55,11 +56,17 @@ void message_algorithm_hash_print(const void* message, size_t size, const char* 
 void opt_wrong(void)
 {
   if(optopt == 'a')
+  {
     fprintf(stderr, "Option -%c requires an argument.\n", optopt);
+  }
   else if(isprint(optopt))
+  {
     fprintf(stderr, "Unknown option `-%c'.\n", optopt);
+  }
   else
+  {
     fprintf(stderr, "Unknown option character `\\x%x'.\n", optopt);
+  }
 }
 
 /*
@@ -98,8 +105,15 @@ int args_parse(int argc, char* argv[])
     if(opt_parse(opt) != 0) return 1;
   }
 
-  // Non-option argument was supplied
-  if(optind < argc) filepath = argv[optind];
+  pamount = (argc - optind);
+
+  paths = malloc(sizeof(char*) * pamount);
+
+  // Every non-option argument gets added as a file
+  for(int index = 0; (optind + index) < argc; index++)
+  {
+    paths[index] = argv[optind + index];
+  }
 
   // Assignes default algorithm if not specified
   if(algorithm == NULL) algorithm = "sha256";
@@ -108,98 +122,33 @@ int args_parse(int argc, char* argv[])
 }
 
 /*
- * Get the size of the data in a file at the inputted path
- *
- * PARAMS
- * - const char* filepath | The path to the file
- *
- * RETURN (size_t size)
- * - 0  | Error
- * - >0 | Success!
- */
-size_t file_size(const char* filepath)
-{
-  FILE* stream = fopen(filepath, "rb");
-
-  if(stream == NULL) return 0;
-
-  fseek(stream, 0, SEEK_END); 
-
-  size_t size = ftell(stream);
-
-  fseek(stream, 0, SEEK_SET); 
-
-  fclose(stream);
-
-  return size;
-}
-
-/*
- * Read data from file and store it at the inputted address
- *
- * PARAMS
- * - void* pointer        | The address to store the read data
- * - size_t size          | The size of the data to read
- * - size_t nmemb         | The size of the chunks
- * - const char* filepath | The path to the file
- *
- * RETURN (same as fread)
- * - 0  | Error
- * - >0 | Success!
- */
-int file_read(void* pointer, size_t size, size_t nmemb, const char* filepath)
-{
-  FILE* stream = fopen(filepath, "rb");
-
-  if(stream == NULL) return 0;
-
-  int status = fread(pointer, size, nmemb, stream);
-
-  fclose(stream);
-
-  return status;
-}
-
-/*
  * RETURNS
  * - 0 | Success!
  * - 1 | Failed to parse arguments
- * - 2 | Failed to read inputted file
- * - 3 | Failed to input from stdin
  */
 int main(int argc, char* argv[])
 {
   if(args_parse(argc, argv) != 0) return 1;
 
-  if(filepath != NULL)
-  {
-    size_t size = file_size(filepath);
+  // 1. Get all the FILES that will be hashed
+  size_t amount = files_amount(paths, pamount, -1);
 
-    char message[size];
+  char** files = files_create(amount, paths, pamount, -1);
 
-    if(file_read(message, size, 1, filepath) == 0)
-    {
-      printf("Failed to read inputted file\n");
+  // 2. Read the files to the hash MESSAGE
+  size_t size = files_size(files, amount);
 
-      return 2;
-    }
+  char message[size + 1];
 
-    message_algorithm_hash_print(message, size, algorithm);
-  }
-  else
-  {
-    char message[1024];
-    memset(message, '\0', sizeof(message));
+  files_read(message, size, 1, files, amount);
 
-    if(fgets(message, sizeof(message), stdin) == NULL)
-    {
-      printf("No message was inputted\n");
+  // 3. Hash the message and PRINT the checksum
+  message_hash_print(message, size);
 
-      return 3;
-    }
+  // 4. FREE the used varaibles
+  files_free(files, amount);
 
-    message_algorithm_hash_print(message, strlen(message), algorithm);
-  }
+  free(paths);
 
   return 0; // Success!
 }
