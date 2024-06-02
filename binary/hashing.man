@@ -13,12 +13,22 @@ computes the checksum of a file or some input from stdin using the supplied hash
 
 .SH OPTIONS
 .TP
-.BR \-a " " \fI <algorithm>
+.BR \-a ", " \fB\-\-algorithm " " \fI <algorithm>
 The hash algorithm to use when computing the checksum.
 
 See \fBALGORITHMS\fR for which hash algorithms is supported.
 
 Note: When no algorithm is supplied, \fBsha256\fR is used.
+
+.TP
+.BR \-d ", " \fB\-\-depth " " \fI <depth>
+When supplying one or more directories, the depth is the limit of how deep to search for files.
+
+Note: When no depth is supplied, the program will search indefinitely. To specify the program to search indefinitely, supply the depth \fB-1\fR.
+
+.TP
+.BR \-c ", " \fB\-\-concat
+When supplying more than one file, \fBconcatonate\fR the data and create a single hash checksum.
 
 .SH ALGORITHMS
 .TP

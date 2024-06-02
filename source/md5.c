@@ -2,6 +2,8 @@
  * The MD5 algorithm
  *
  * Credit: https://en.wikipedia.org/wiki/MD5
+ *
+ * Last updated: 2024-03-20
  */
 
 #include <stdint.h>

@@ -2,6 +2,8 @@
  * The SHA256 algorithm
  *
  * Credit: https://sha256algorithm.com
+ *
+ * Last updated: 2024-05-04
  */
 
 #include <stdint.h>
