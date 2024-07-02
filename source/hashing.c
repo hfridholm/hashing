@@ -68,8 +68,6 @@ static error_t opt_parse(int key, char* arg, struct argp_state* state)
       break;
 
     case ARGP_KEY_END:
-      // Use this line of code if the user has to input a file
-      // if(state->arg_num < 1) argp_usage(state);
       break;
 
     default:
@@ -113,42 +111,48 @@ static int message_hash(char* hash, const void* message, size_t size)
  */
 static void files_concat_hash_print(char** files, size_t count)
 {
-  size_t size = files_size(files, count);
+  size_t files_size = files_size_get(files, count);
 
-  char message[size + 1];
+  size_t nmemb = files_size / sizeof(char);
 
-  files_read(message, size, 1, files, count);
+  char message[nmemb + 1];
+  memset(message, '\0', sizeof(message));
+
+  size_t read_nmemb = files_read(message, sizeof(char), nmemb, files, count);
 
   char hash[64 + 1];
   memset(hash, '\0', sizeof(hash));
 
-  message_hash(hash, message, size);
+  message_hash(hash, message, sizeof(char) * read_nmemb);
 
   printf("%s\n", hash);
 }
 
 /*
  * PARAMS
- * - char*       hash     |
- * - size_t      size     |
- * - const char* filepath |
+ * - char*       hash     | Pointer to memory to store hash at
+ * - const char* filepath | Path to file
  *
  * RETURN (same as message_hash)
  */
-static int file_hash(char* hash, size_t size, const char* filepath)
+static int file_hash(char* hash, const char* filepath)
 {
-  char message[size + 1];
+  size_t file_size = file_size_get(filepath);
+
+  size_t nmemb = file_size / sizeof(char);
+
+  char message[nmemb + 1];
   memset(message, '\0', sizeof(message));
 
-  file_read(message, size, 1, filepath);
+  size_t read_nmemb = file_read(message, sizeof(char), nmemb, filepath);
 
-  return message_hash(hash, message, size);
+  return message_hash(hash, message, sizeof(char) * read_nmemb);
 }
 
 /*
  * PARAMS
- * - char*  message |
- * - size_t size    |
+ * - char*  message | Pointer to memory to store message at
+ * - size_t size    | Max size of message
  *
  * RETURN (size_t length)
  */
@@ -172,7 +176,7 @@ static size_t message_input(char* message, size_t size)
 
 /*
  * PARAMS
- * - char* hash |
+ * - char* hash | Pointer to memory to store hash at
  *
  * RETURN (same as message_hash)
  */
@@ -202,9 +206,7 @@ static void files_separate_hash_print(char** files, size_t count)
   {
     if(strcmp(files[index], "-") != 0)
     {
-      size_t size = file_size(files[index]);
-
-      file_hash(hash, size, files[index]);
+      file_hash(hash, files[index]);
     }
     else stdin_hash(hash);
 
@@ -221,9 +223,9 @@ int main(int argc, char* argv[])
 {
   argp_parse(&argp, argc, argv, 0, 0, &args);
 
-  size_t count = files_count(args.args, args.arg_count, args.depth);
+  size_t count = 0;
 
-  char** files = files_create(count, args.args, args.arg_count, args.depth);
+  char** files = files_create(&count, args.args, args.arg_count, args.depth);
 
   if(count == 0 && !files)
   {

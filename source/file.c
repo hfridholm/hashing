@@ -1,7 +1,9 @@
 /*
+ * Read data from files
+ *
  * Written by Hampus Fridholm
  *
- * Last updated: 2024-07-01
+ * Last updated: 2024-07-02
  */
 
 #include <stdio.h>
@@ -11,16 +13,18 @@
 #include <sys/stat.h>
 
 /*
- * Get the size of the data in a file at the inputted path
+ * Get the size of the file at the inputted path
+ *
+ * The function returns the number of bytes the file contains
  *
  * PARAMS
- * - const char* filepath | The path to the file
+ * - const char* filepath | Path to file
  *
  * RETURN (size_t size)
  * - 0  | Error
- * - >0 | Success!
+ * - >0 | Success
  */
-size_t file_size(const char* filepath)
+size_t file_size_get(const char* filepath)
 {
   FILE* stream = fopen(filepath, "rb");
 
@@ -38,29 +42,33 @@ size_t file_size(const char* filepath)
 }
 
 /*
- * Read data from file and store it at the inputted address
+ * Read a number of chunks from file to memory at pointer
+ *
+ * The function returns the number of read chunks
  *
  * PARAMS
- * - void* pointer        | The address to store the read data
- * - size_t size          | The size of the data to read
- * - size_t nmemb         | The size of the chunks
- * - const char* filepath | The path to the file
+ * - void*       pointer  | Pointer to memory to read data to
+ * - size_t      msize    | Size of each member
+ * - size_t      nmemb    | Number of members
+ * - const char* filepath | Path to file
  *
- * RETURN (same as fread)
+ * RETURN (same as fread, size_t read_nmemb)
  * - 0  | Error
- * - >0 | Success!
+ * - >0 | Success
  */
-int file_read(void* pointer, size_t size, size_t nmemb, const char* filepath)
+size_t file_read(void* pointer, size_t msize, size_t nmemb, const char* filepath)
 {
+  if(!pointer) return 0;
+
   FILE* stream = fopen(filepath, "rb");
 
   if(!stream) return 0;
 
-  int status = fread(pointer, size, nmemb, stream);
+  size_t read_nmemb = fread(pointer, msize, nmemb, stream);
 
   fclose(stream);
 
-  return status;
+  return read_nmemb;
 }
 
 /*
@@ -70,9 +78,12 @@ int file_read(void* pointer, size_t size, size_t nmemb, const char* filepath)
  * - const char* base | Directory path
  * - const char* name | Name of file
  *
+ * EXPECT
+ * - both base and name are allocated
+ *
  * RETURN (char* fullpath)
  */
-static char* full_path(const char* base, const char* name)
+static char* full_path_create(const char* base, const char* name)
 {
   size_t bsize = strlen(base);
   size_t nsize = strlen(name);
@@ -85,10 +96,12 @@ static char* full_path(const char* base, const char* name)
 }
 
 /*
+ * Allocate file paths from directory to array of filepaths
+ *
  * PARAMS
- * - char**      files   | The files in the directory
+ * - char***     files   | Pointer to paths to files
  * - size_t*     count   | Number of files
- * - const char* dirpath | The path to the directory
+ * - const char* dirpath | Path to directory
  * - int         depth   | How many directories to open
  * 
  * Note:
@@ -99,7 +112,7 @@ static char* full_path(const char* base, const char* name)
  * - 0 | Success!
  * - 1 | Failed to open directory
  */
-static int dir_files(char** files, size_t* count, const char* dirpath, int depth)
+static int dir_files_alloc(char*** files, size_t* count, const char* dirpath, int depth)
 {
   if(depth == 0) return 0;
 
@@ -116,75 +129,29 @@ static int dir_files(char** files, size_t* count, const char* dirpath, int depth
     if(strcmp(dire->d_name, "..") == 0) continue;
 
 
-    if(dire->d_type == DT_DIR)
+    if(dire->d_type == DT_REG)
     {
-      char* fullpath = full_path(dirpath, dire->d_name);
+      *files = realloc(*files, sizeof(char*) * (*count + 1));
+
+      (*files)[(*count)++] = full_path_create(dirpath, dire->d_name);
+    }
+    else if(dire->d_type == DT_DIR)
+    {
+      char* fullpath = full_path_create(dirpath, dire->d_name);
 
       if(depth == -1)
       {
-        dir_files(files, count, fullpath, -1);
+        dir_files_alloc(files, count, fullpath, -1);
       }
-      else dir_files(files, count, fullpath, depth - 1);
+      else dir_files_alloc(files, count, fullpath, depth - 1);
 
       free(fullpath);
-    }
-    else if(dire->d_type == DT_REG)
-    {
-      files[(*count)++] = full_path(dirpath, dire->d_name);
     }
   }
 
   closedir(dirp);
 
   return 0; // Success!
-}
-
-/*
- * Get the count of files a directory contain recursivly
- *
- * PARAMS
- * - const char* dirpath | The directory to count files in
- * - int         depth   | How many directories to open
- *
- * RETURN (size_t count)
- */
-static size_t dir_count(const char* dirpath, int depth)
-{
-  if(depth == 0) return 0;
-
-  struct dirent* dire;
-
-  DIR* dirp = opendir(dirpath);
-
-  if(!dirp) return 0;
-
-  int count = 0;
-
-  while((dire = readdir(dirp)) != NULL)
-  {
-    if(strcmp(dire->d_name, ".")  == 0) continue;
-
-    if(strcmp(dire->d_name, "..") == 0) continue;
-
-
-    if(dire->d_type == DT_DIR)
-    {
-      char* fullpath = full_path(dirpath, dire->d_name);
-
-      if(depth == -1)
-      {
-        count += dir_count(fullpath, -1);
-      }
-      else count += dir_count(fullpath, depth - 1);
-
-      free(fullpath);
-    }
-    else if(dire->d_type == DT_REG) count++;
-  }
-
-  closedir(dirp);
-
-  return count;
 }
 
 /*
@@ -198,11 +165,11 @@ static size_t dir_count(const char* dirpath, int depth)
  * - 1 | File
  * - 2 | Directory
  */
-static int path_type(const char* path)
+static int path_type_get(const char* path)
 {
   struct stat pstat;
 
-  stat(path, &pstat);
+  if(stat(path, &pstat) == -1) return 0;
 
   if(pstat.st_mode & S_IFREG) return 1;
 
@@ -212,124 +179,80 @@ static int path_type(const char* path)
 }
 
 /*
- * Calculate the number of files in path recursivly
+ * Allocate either path to file or paths to files in directory
  *
  * PARAMS
- * - const char* path  | The path to either a dir or a file
+ * - char***     files | Pointer to paths to files
+ * - size_t*     count | Number of files
+ * - const char* path  | Path to either file or dir
  * - int         depth | How many directories to open
  *
- * RETURN (size_t count)
+ * EXPECT
+ * - files, count and path are allocated
  */
-static size_t paths_count(const char* path, int depth)
+static void path_files_alloc(char*** files, size_t* count, const char* path, int depth)
 {
-  if(depth == 0) return 0;
+  int path_type = path_type_get(path);
 
-  switch(path_type(path))
+  // 1. If the path points to a file, or is blank
+  if(path_type == 1 || strcmp(path, "-") == 0)
   {
-    case 1: return 1;
+    *files = realloc(*files, sizeof(char*) * (*count + 1));
 
-    case 2: return dir_count(path, depth);
-
-    default: return 0;
+    (*files)[(*count)++] = strdup(path);
+  }
+  else if(path_type == 2)
+  {
+    dir_files_alloc(files, count, path, depth);
   }
 }
 
 /*
- * PARAMS
- * - char** paths      |
- * - size_t path_count |
- * - int    depth      | How many directories to open
+ * Create an array of paths to files based on inputted paths to either file or dir
  *
- * RETURN (size_t count)
- */
-size_t files_count(char** paths, size_t path_count, int depth)
-{
-  size_t count = 0;
-
-  for(size_t index = 0; index < path_count; index++)
-  {
-    if(strcmp(paths[index], "-") == 0)
-    {
-      count++;
-    }
-    else count += paths_count(paths[index], depth);
-  }
-
-  return count;
-}
-
-/*
- * PARAMS
- * - char**      files |
- * - size_t*     count |
- * - const char* path  |
- * - int         depth |
+ * Last updated: 2024-07-02
  *
- * RETURN (int status)
- * - 0 | Error
- * - 1 | Parsed path as file
- * - 2 | Parsed path as dir
- */
-static int path_files(char** files, size_t* count, const char* path, int depth)
-{
-  switch(path_type(path))
-  {
-    case 1:
-      files[(*count)++] = strdup(path);
-      return 1;
-
-    case 2:
-      dir_files(files, count, path, depth);
-      return 2;
-
-    default:
-      return 0;
-  }
-}
-
-/*
  * PARAMS
- * - size_t count      |
- * - char** paths      |
- * - size_t path_count |
- * - int    depth      |
+ * - size_t* count      | Pointer to number of files
+ * - char**  paths      | Paths to either file or dir
+ * - size_t  path_count | Number of paths to either file or dir
+ * - int     depth      | How many directories to open
  *
  * RETURN (char** files)
  */
-char** files_create(size_t count, char** paths, size_t path_count, int depth)
+char** files_create(size_t* count, char** paths, size_t path_count, int depth)
 {
-  if(count == 0) return NULL;
+  if(!count || !paths) return NULL;
 
-  char** files = malloc(sizeof(char*) * count);
+  char** files = NULL;
+  *count = 0;
 
-  size_t file_index = 0;
-
-  for(int index = 0; index < path_count; index++)
+  for(size_t index = 0; index < path_count; index++)
   {
-    if(strcmp(paths[index], "-") == 0)
-    {
-      files[file_index++] = strdup(paths[index]);
-    }
-    else path_files(files, &file_index, paths[index], depth);
+    path_files_alloc(&files, count, paths[index], depth);
   }
   
   return files;
 }
 
 /*
+ * Get the combined size of data of the inputted files
+ *
  * PARAMS
- * - char** files |
- * - size_t count |
+ * - char** files | Paths to files
+ * - size_t count | Number of files
  *
  * RETURN (size_t size)
  */
-size_t files_size(char** files, size_t count)
+size_t files_size_get(char** files, size_t count)
 {
+  if(!files) return 0;
+
   size_t size = 0;
 
   for(size_t index = 0; index < count; index++)
   {
-    size += file_size(files[index]);
+    size += file_size_get(files[index]);
   }
 
   return size;
@@ -338,50 +261,60 @@ size_t files_size(char** files, size_t count)
 /*
  * Read and concatonate multiple files into single memory at pointer
  *
- * PARAMS
- * - void*  pointer |
- * - size_t size    |
- * - size_t nmemb   |
- * - char** files   |
- * - size_t count   |
+ * The function returns the total number of read chunks
  *
- * RETURN (int status)
- * - 0 | Success!
- * - 1 | Failed to read a file
+ * If the files contain more data than the inputted size can hold, no more data will be read
+ *
+ * Note: The msize can not be 0, then division by 0 would occur
+ *
+ * PARAMS
+ * - void*  pointer | Pointer to memory to save read data to
+ * - size_t msize   | Size of each member
+ * - size_t nmemb   | Number of members
+ * - char** files   | Paths to files
+ * - size_t count   | Number of files
+ *
+ * RETURN (size_t read_nmemb)
  */
-int files_read(void* pointer, size_t size, size_t nmemb, char** files, size_t count)
+size_t files_read(void* pointer, size_t msize, size_t nmemb, char** files, size_t count)
 {
-  size_t shift = 0;
+  if(!pointer || msize == 0 || !files) return 0;
 
-  for(int index = 0; index < count; index++)
+  size_t read_nmemb = 0;
+
+  for(size_t index = 0; index < count; index++)
   {
-    size_t fsize = file_size(files[index]);
+    size_t file_size = file_size_get(files[index]);
 
-    if(fsize == 0) continue;
+    size_t file_nmemb = file_size / msize;
 
-    fsize = (shift + fsize > size) ? (size - shift) : fsize;
+    // If the total read data would overwrite the buffer,
+    // only read the amount of data that the buffer can hold
+    if(read_nmemb + file_nmemb > nmemb)
+    {
+      read_nmemb += file_read(pointer + read_nmemb * msize, msize, nmemb - read_nmemb, files[index]);
+      
+      break;
+    }
 
-    int status = file_read(pointer + shift, fsize, nmemb, files[index]);
-
-    if(status == 0) return 1;
-
-    shift += fsize;
+    read_nmemb += file_read(pointer + read_nmemb * msize, msize, file_nmemb, files[index]);
   }
-  return 0;
+
+  return read_nmemb;
 }
 
 /*
  * Free the pointers in the files string array
  *
  * PARAMS
- * - char** files |
- * - size_t count |
+ * - char** files | Pointer to strings (pointer to char)
+ * - size_t count | Number of pointers
  */
 void files_free(char** files, size_t count)
 {
   if(!files) return;
 
-  for(int index = 0; index < count; index++)
+  for(size_t index = 0; index < count; index++)
   {
     if(files[index]) free(files[index]);
   }
