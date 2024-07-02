@@ -15,9 +15,10 @@ man ./hashing.man
 ```
 
 # Features
-This program uses [getopt](https://www.gnu.org/software/libc/manual/html_node/Example-of-Getopt.html) to parse the program arguments. Other ways of parsing arguments is to use `argp` or to implement your own solution even though it's not recommended.
 
-`getopt` seems to let you input arguments using single characters, for example `-a`, not full argument names like `--algorithm`. But apart from that let-back, it even lets you super easily create customerror messages if some arguments couldn't be parsed.
+This program uses`argp`
+
+Hit CTRL-D to input EOF symbol - to terminate the inputted message.
 
 # Resources
 

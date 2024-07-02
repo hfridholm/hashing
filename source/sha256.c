@@ -1,9 +1,11 @@
 /*
  * The SHA256 algorithm
  *
+ * Written by Hampus Fridholm
+ *
  * Credit: https://sha256algorithm.com
  *
- * Last updated: 2024-05-04
+ * Last updated: 2024-07-01
  */
 
 #include <stdint.h>
@@ -21,11 +23,16 @@
  */
 static char* hs_hash(char hash[64], const uint32_t hs[8])
 {
+  char temp_hash[64 + 1];
+
   for(uint8_t index = 0; index < 8; index++)
   {
     // hash + (index * 8) points to the current 8 characters
-    sprintf(hash + (index * 8), "%08x", hs[index]);
+    sprintf(temp_hash + (index * 8), "%08x", hs[index]);
   }
+
+  strncpy(hash, temp_hash, sizeof(char) * 64);
+
   return hash;
 }
 
@@ -277,6 +284,8 @@ static char* block_hash(char hash[64], const uint32_t* block, size_t chunks)
 /*
  * Create a SHA256 hash of the inputted message
  *
+ * The created hash is not null terminated
+ *
  * PARAMS
  * - char hash[64]       | A pointer to the "will be created"-hash 
  * - const void* message | The message to hash
@@ -284,10 +293,10 @@ static char* block_hash(char hash[64], const uint32_t* block, size_t chunks)
  *
  * RETURN (char* hash)
  */
-extern char* sha256(char hash[64], const void* message, size_t size)
+char* sha256(char hash[64], const void* message, size_t size)
 {
-  size_t chunks = CHUNKS(size);
-  uint16_t zeros = ZEROS(size);
+  size_t   chunks = CHUNKS(size);
+  uint16_t zeros  = ZEROS(size);
 
   uint32_t block[chunks * 16];
 

@@ -1,3 +1,9 @@
+/*
+ * Written by Hampus Fridholm
+ *
+ * Last updated: 2024-07-01
+ */
+
 #include "hashing.h"
 
 static char doc[] = "hashing - compute hash algorithm checksum";
@@ -6,9 +12,9 @@ static char args_doc[] = "[FILE...]";
 
 static struct argp_option options[] =
 {
-  { "algorithm", 'a', "FILE",  0, "The hash algorithm to use" },
-  { "depth",     'd', "COUNT", 0, "The search depth in directory" },
-  { "concat",    'c', 0,       0, "Concatonate the file hashes" },
+  { "algorithm", 'a', "STRING", 0, "The hash algorithm to use" },
+  { "depth",     'd', "COUNT",  0, "The search depth in directory" },
+  { "concat",    'c', 0,        0, "Concatonate the file hashes" },
   { 0 }
 };
 
@@ -62,7 +68,8 @@ static error_t opt_parse(int key, char* arg, struct argp_state* state)
       break;
 
     case ARGP_KEY_END:
-      if(state->arg_num < 1) argp_usage(state);
+      // Use this line of code if the user has to input a file
+      // if(state->arg_num < 1) argp_usage(state);
       break;
 
     default:
@@ -82,7 +89,7 @@ static error_t opt_parse(int key, char* arg, struct argp_state* state)
  */
 static int message_hash(char* hash, const void* message, size_t size)
 {
-  if(args.alg == NULL) return 1;
+  if(!args.alg) return 1;
 
   if(!strcmp(args.alg, "sha256"))
   {
@@ -104,7 +111,7 @@ static int message_hash(char* hash, const void* message, size_t size)
  * - char** files | The files to create hash from
  * - size_t count | The number of files
  */
-void files_concat_hash_print(char** files, size_t count)
+static void files_concat_hash_print(char** files, size_t count)
 {
   size_t size = files_size(files, count);
 
@@ -121,27 +128,85 @@ void files_concat_hash_print(char** files, size_t count)
 }
 
 /*
+ * PARAMS
+ * - char*       hash     |
+ * - size_t      size     |
+ * - const char* filepath |
+ *
+ * RETURN (same as message_hash)
+ */
+static int file_hash(char* hash, size_t size, const char* filepath)
+{
+  char message[size + 1];
+  memset(message, '\0', sizeof(message));
+
+  file_read(message, size, 1, filepath);
+
+  return message_hash(hash, message, size);
+}
+
+/*
+ * PARAMS
+ * - char*  message |
+ * - size_t size    |
+ *
+ * RETURN (size_t length)
+ */
+static size_t message_input(char* message, size_t size)
+{
+  size_t length;
+
+  for(length = 0; length < size; length++)
+  {
+    char symbol = fgetc(stdin);
+
+    message[length] = symbol;
+
+    if(symbol == EOF || symbol == '\0') break;
+  }
+
+  message[length] = '\0';
+
+  return length;
+}
+
+/*
+ * PARAMS
+ * - char* hash |
+ *
+ * RETURN (same as message_hash)
+ */
+static int stdin_hash(char* hash)
+{
+  char message[1024];
+  memset(message, '\0', sizeof(message));
+
+  size_t size = message_input(message, sizeof(message) - 1);
+
+  return message_hash(hash, message, size);
+}
+
+/*
  * Create hashes from files and print them
  *
  * PARAMS
  * - char** files | The files to create hash from
  * - size_t count | The number of files
  */
-void files_separate_hash_print(char** files, size_t count)
+static void files_separate_hash_print(char** files, size_t count)
 {
   char hash[64 + 1];
+  memset(hash, '\0', sizeof(hash));
 
   for(size_t index = 0; index < count; index++)
   {
-    size_t size = file_size(files[index]);
+    if(strcmp(files[index], "-") != 0)
+    {
+      size_t size = file_size(files[index]);
 
-    char message[size + 1];
-
-    file_read(message, size, 1, files[index]);
-
-    memset(hash, '\0', sizeof(hash));
-
-    message_hash(hash, message, size);
+      file_hash(hash, size, files[index]);
+    }
+    else stdin_hash(hash);
 
     printf("%s  %s\n", hash, files[index]);
   }
@@ -150,9 +215,7 @@ void files_separate_hash_print(char** files, size_t count)
 static struct argp argp = { options, opt_parse, args_doc, doc };
 
 /*
- * RETURN (int status)
- * - 0 | Success!
- * - 1 | No files was inputted
+ * This is the main function
  */
 int main(int argc, char* argv[])
 {
@@ -160,24 +223,20 @@ int main(int argc, char* argv[])
 
   size_t count = files_count(args.args, args.arg_count, args.depth);
 
-  if(count == 0)
-  {
-    printf("No files to hash...\n");
-
-    if(args.args) free(args.args);
-
-    return 1;
-  }
-
   char** files = files_create(count, args.args, args.arg_count, args.depth);
 
+  if(count == 0 && !files)
+  {
+    files = malloc(sizeof(char*));
+
+    files[count++] = strdup("-");
+  }
 
   if(args.concat)
   {
     files_concat_hash_print(files, count);
   }
   else files_separate_hash_print(files, count);
-
 
   files_free(files, count);
 

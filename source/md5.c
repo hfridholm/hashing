@@ -3,7 +3,7 @@
  *
  * Credit: https://en.wikipedia.org/wiki/MD5
  *
- * Last updated: 2024-03-20
+ * Last updated: 2024-07-01
  */
 
 #include <stdint.h>
@@ -26,11 +26,16 @@
  */
 static char* abcd_hash(char hash[32], const uint32_t abcd[4])
 {
+  char temp_hash[32 + 1];
+
   for(uint8_t index = 0; index < 4; index++)
   {
     // hash + (index * 8) points to the current 8 characters
-    sprintf(hash + (index * 8), "%08x", LENDIAN(abcd[index]));
+    sprintf(temp_hash + (index * 8), "%08x", LENDIAN(abcd[index]));
   }
+
+  strncpy(hash, temp_hash, sizeof(char) * 32);
+
   return hash;
 }
 
@@ -247,10 +252,22 @@ static char* block_hash(char hash[32], const uint32_t* block, size_t chunks)
   return abcd_hash(hash, abcd);
 }
 
-extern char* md5(char hash[32], const void* message, size_t size)
+/*
+ * Create a MD5 hash of the inputted message
+ *
+ * The created hash is not null terminated
+ *
+ * PARAMS
+ * - char hash[32]       | A pointer to the "will be created"-hash 
+ * - const void* message | The message to hash
+ * - size_t size         | The amount of bytes (8 bits)
+ *
+ * RETURN (char* hash)
+ */
+char* md5(char hash[32], const void* message, size_t size)
 {
-  size_t chunks = CHUNKS(size);
-  uint16_t zeros = ZEROS(size);
+  size_t   chunks = CHUNKS(size);
+  uint16_t zeros  = ZEROS(size);
 
   uint32_t block[chunks * 16];
 
