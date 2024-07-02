@@ -1,4 +1,6 @@
 /*
+ * Compute hash algorithm checksum
+ *
  * Written by Hampus Fridholm
  *
  * Last updated: 2024-07-01
@@ -99,7 +101,7 @@ static int message_hash(char* hash, const void* message, size_t size)
   }
   else return 2;
 
-  return 0; // Success!
+  return 0;
 }
 
 /*
@@ -113,17 +115,15 @@ static void files_concat_hash_print(char** files, size_t count)
 {
   size_t files_size = files_size_get(files, count);
 
-  size_t nmemb = files_size / sizeof(char);
-
-  char message[nmemb + 1];
+  char message[files_size];
   memset(message, '\0', sizeof(message));
 
-  size_t read_nmemb = files_read(message, sizeof(char), nmemb, files, count);
+  size_t read_size = files_read(message, files_size, files, count);
 
   char hash[64 + 1];
   memset(hash, '\0', sizeof(hash));
 
-  message_hash(hash, message, sizeof(char) * read_nmemb);
+  message_hash(hash, message, read_size);
 
   printf("%s\n", hash);
 }
@@ -139,14 +139,12 @@ static int file_hash(char* hash, const char* filepath)
 {
   size_t file_size = file_size_get(filepath);
 
-  size_t nmemb = file_size / sizeof(char);
-
-  char message[nmemb + 1];
+  char message[file_size];
   memset(message, '\0', sizeof(message));
 
-  size_t read_nmemb = file_read(message, sizeof(char), nmemb, filepath);
+  size_t read_size = file_read(message, file_size, filepath);
 
-  return message_hash(hash, message, sizeof(char) * read_nmemb);
+  return message_hash(hash, message, read_size);
 }
 
 /*
@@ -224,7 +222,6 @@ int main(int argc, char* argv[])
   argp_parse(&argp, argc, argv, 0, 0, &args);
 
   size_t count = 0;
-
   char** files = files_create(&count, args.args, args.arg_count, args.depth);
 
   if(count == 0 && !files)
@@ -244,5 +241,5 @@ int main(int argc, char* argv[])
 
   if(args.args) free(args.args);
 
-  return 0; // Success!
+  return 0;
 }

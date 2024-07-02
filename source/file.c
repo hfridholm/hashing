@@ -42,21 +42,20 @@ size_t file_size_get(const char* filepath)
 }
 
 /*
- * Read a number of chunks from file to memory at pointer
+ * Read a number of bytes from file to memory at pointer
  *
- * The function returns the number of read chunks
+ * The function returns the number of read bytes
  *
  * PARAMS
  * - void*       pointer  | Pointer to memory to read data to
- * - size_t      msize    | Size of each member
- * - size_t      nmemb    | Number of members
+ * - size_t      size     | Number of bytes to read
  * - const char* filepath | Path to file
  *
- * RETURN (same as fread, size_t read_nmemb)
+ * RETURN (same as fread, size_t read_size)
  * - 0  | Error
  * - >0 | Success
  */
-size_t file_read(void* pointer, size_t msize, size_t nmemb, const char* filepath)
+size_t file_read(void* pointer, size_t size, const char* filepath)
 {
   if(!pointer) return 0;
 
@@ -64,11 +63,11 @@ size_t file_read(void* pointer, size_t msize, size_t nmemb, const char* filepath
 
   if(!stream) return 0;
 
-  size_t read_nmemb = fread(pointer, msize, nmemb, stream);
+  size_t read_size = fread(pointer, 1, size, stream);
 
   fclose(stream);
 
-  return read_nmemb;
+  return read_size;
 }
 
 /*
@@ -261,46 +260,39 @@ size_t files_size_get(char** files, size_t count)
 /*
  * Read and concatonate multiple files into single memory at pointer
  *
- * The function returns the total number of read chunks
+ * The function returns the total number of read bytes
  *
- * If the files contain more data than the inputted size can hold, no more data will be read
- *
- * Note: The msize can not be 0, then division by 0 would occur
+ * If the total read data would overwrite the buffer,
+ * only read the amount of data that the buffer can hold
  *
  * PARAMS
  * - void*  pointer | Pointer to memory to save read data to
- * - size_t msize   | Size of each member
- * - size_t nmemb   | Number of members
+ * - size_t size    | Number of bytes to read
  * - char** files   | Paths to files
  * - size_t count   | Number of files
  *
- * RETURN (size_t read_nmemb)
+ * RETURN (size_t read_size)
  */
-size_t files_read(void* pointer, size_t msize, size_t nmemb, char** files, size_t count)
+size_t files_read(void* pointer, size_t size, char** files, size_t count)
 {
-  if(!pointer || msize == 0 || !files) return 0;
+  if(!pointer || !files) return 0;
 
-  size_t read_nmemb = 0;
+  size_t read_size = 0;
 
   for(size_t index = 0; index < count; index++)
   {
     size_t file_size = file_size_get(files[index]);
 
-    size_t file_nmemb = file_size / msize;
-
-    // If the total read data would overwrite the buffer,
-    // only read the amount of data that the buffer can hold
-    if(read_nmemb + file_nmemb > nmemb)
+    if(read_size + file_size > size)
     {
-      read_nmemb += file_read(pointer + read_nmemb * msize, msize, nmemb - read_nmemb, files[index]);
+      read_size += file_read(pointer + read_size, size - read_size, files[index]);
       
       break;
     }
-
-    read_nmemb += file_read(pointer + read_nmemb * msize, msize, file_nmemb, files[index]);
+    else read_size += file_read(pointer + read_size, file_size, files[index]);
   }
 
-  return read_nmemb;
+  return read_size;
 }
 
 /*
