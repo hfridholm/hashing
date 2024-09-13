@@ -1,9 +1,11 @@
 /*
  * The MD5 algorithm
  *
+ * Written by Hampus Fridholm
+ *
  * Credit: https://en.wikipedia.org/wiki/MD5
  *
- * Last updated: 2024-07-01
+ * Last updated: 2024-09-13
  */
 
 #include <stdint.h>
@@ -170,21 +172,25 @@ static void block_message_prepend(uint32_t* block, const void* message, size_t s
   }
 }
 
-// This is the equivalent to ceil(size / 64)
-#define INIT_CHUNKS(SIZE) (((SIZE) & 0b111111) ? ((SIZE) >> 6) + 1 : (SIZE) >> 6)
+/*
+ * Calculate the initial amount of chunks (no extra chunk)
+ *
+ * This is the equivalent to ceil(size / 64)
+ */
+#define INITIAL_CHUNKS(SIZE) (((SIZE) & 0b111111) ? ((SIZE) >> 6) + 1 : (SIZE) >> 6)
 
 /*
- * Check if the size is between 56 and 64 bytes
- * That is when you have to add an extra chunk
+ * Check if an extra chunk is needed
+ *
+ * Either if the message would occupy the 1-bit and the length bits
+ *     or if the message already occupies a whole chunk
  */
-#define EXTRA_CHUNK(SIZE) (((SIZE) & 0b111000) == 0b111000)
-/*
- * Calculates the amount of message bits in the last chunk
- */
-#define MOD_BITS(SIZE) (((SIZE) & 0b111111) * 8)
+#define EXTRA_CHUNK(SIZE) ((((SIZE) & 0b111000) == 0b111000) || ((SIZE & 0b111111) == 0b000000))
 
-#define CHUNKS(SIZE) (((SIZE) == 0) ? 1 : (EXTRA_CHUNK(SIZE) ? (INIT_CHUNKS(SIZE) + 1) : INIT_CHUNKS(SIZE)))
-#define ZEROS(SIZE) (((SIZE) == 0) ? 448 : (EXTRA_CHUNK(SIZE) ? (959 - MOD_BITS(SIZE)) : (447 - MOD_BITS(SIZE))))
+
+#define CHUNKS(SIZE) (EXTRA_CHUNK(SIZE) ? (INITIAL_CHUNKS(SIZE) + 1) :  INITIAL_CHUNKS(SIZE))
+
+#define ZEROS(SIZE, CHUNKS) (((CHUNKS) * 64 - (SIZE)) * 8 - 64 - 1)
 
 /*
  * Create the message block needed to generate the MD5 hash
@@ -267,7 +273,7 @@ static char* block_hash(char hash[32], const uint32_t* block, size_t chunks)
 char* md5(char hash[32], const void* message, size_t size)
 {
   size_t   chunks = CHUNKS(size);
-  uint16_t zeros  = ZEROS(size);
+  uint16_t zeros  = ZEROS (size, chunks);
 
   uint32_t block[chunks * 16];
 

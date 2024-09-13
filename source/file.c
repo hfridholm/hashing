@@ -220,6 +220,10 @@ static void path_files_alloc(char*** files, size_t* count, const char* path, int
   {
     dir_files_alloc(files, count, path, depth);
   }
+  else
+  {
+    printf("hashing: %s: No such file or directory\n", path);
+  }
 }
 
 /*
