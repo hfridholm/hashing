@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
 
 #define LENDIAN(WORD) ((((WORD) << 24) & 0xff000000) | \
@@ -32,7 +33,6 @@ static char* abcd_hash(char hash[32], const uint32_t abcd[4])
 
   for(uint8_t index = 0; index < 4; index++)
   {
-    // hash + (index * 8) points to the current 8 characters
     sprintf(temp_hash + (index * 8), "%08x", LENDIAN(abcd[index]));
   }
 
@@ -275,9 +275,13 @@ char* md5(char hash[32], const void* message, size_t size)
   size_t   chunks = CHUNKS(size);
   uint16_t zeros  = ZEROS (size, chunks);
 
-  uint32_t block[chunks * 16];
+  uint32_t* block = malloc(sizeof(uint32_t) * chunks * 16);
 
   block_create(block, chunks, zeros, message, size);
 
-  return block_hash(hash, block, chunks);
+  hash = block_hash(hash, block, chunks);
+
+  free(block);
+
+  return hash;
 }

@@ -122,7 +122,15 @@ static void files_concat_hash_print(char** files, size_t count)
 {
   size_t files_size = files_size_get(files, count);
 
-  char message[files_size];
+  char* message = malloc(sizeof(char) * files_size);
+
+  if(!message)
+  {
+    printf("Files are to large\n");
+
+    return;
+  }
+
 
   size_t read_size = files_read(message, files_size, files, count);
 
@@ -130,6 +138,8 @@ static void files_concat_hash_print(char** files, size_t count)
   memset(hash, '\0', sizeof(hash));
 
   message_hash_create(hash, message, read_size);
+
+  free(message);
 
   printf("%s\n", hash);
 }
@@ -145,11 +155,22 @@ static int file_hash_create(char* hash, const char* filepath)
 {
   size_t file_size = file_size_get(filepath);
 
-  char message[file_size];
+  char* message = malloc(sizeof(char) * file_size);
+
+  if(!message)
+  {
+    printf("Files are to large\n");
+
+    return 0;
+  }
 
   size_t read_size = file_read(message, file_size, filepath);
 
-  return message_hash_create(hash, message, read_size);
+  int status = message_hash_create(hash, message, read_size);
+
+  free(message);
+
+  return status;
 }
 
 /*

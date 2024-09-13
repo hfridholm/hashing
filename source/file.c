@@ -315,11 +315,17 @@ static int path_type_get(const char* path)
 
   if(stat(path, &pstat) == -1) return 0;
 
-  if(pstat.st_mode & S_IFREG) return 1;
+  switch(pstat.st_mode & S_IFMT)
+  {
+    case S_IFREG: return 1;
 
-  if(pstat.st_mode & S_IFDIR) return 2;
+    case S_IFDIR: return 2;
 
-  return 0;
+    case S_IFBLK: case S_IFCHR: case S_IFIFO: case S_IFLNK: case S_IFSOCK:
+      return 3;
+
+    default: return 0;
+  }
 }
 
 /*
@@ -349,7 +355,7 @@ static void path_files_alloc(char*** files, size_t* count, const char* path, int
   {
     dir_files_alloc(files, count, path, depth);
   }
-  else
+  else if(path_type == 0)
   {
     printf("hashing: %s: No such file or directory\n", path);
   }

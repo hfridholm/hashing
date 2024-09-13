@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
 
 /*
@@ -27,7 +28,6 @@ static char* hs_hash(char hash[64], const uint32_t hs[8])
 
   for(uint8_t index = 0; index < 8; index++)
   {
-    // hash + (index * 8) points to the current 8 characters
     sprintf(temp_hash + (index * 8), "%08x", hs[index]);
   }
 
@@ -282,6 +282,7 @@ static char* block_hash(char hash[64], const uint32_t* block, size_t chunks)
     // block + (index * 16) points to the current chunk
     hs_chunk_update(hs, block + (index * 16));
   }
+
   return hs_hash(hash, hs); 
 }
 
@@ -302,9 +303,13 @@ char* sha256(char hash[64], const void* message, size_t size)
   size_t   chunks = CHUNKS(size);
   uint16_t zeros  = ZEROS (size, chunks);
 
-  uint32_t block[chunks * 16];
+  uint32_t* block = malloc(sizeof(uint32_t) * chunks * 16);
 
   block_create(block, chunks, zeros, message, size);
 
-  return block_hash(hash, block, chunks);
+  hash = block_hash(hash, block, chunks);
+
+  free(block);
+
+  return hash;
 }
