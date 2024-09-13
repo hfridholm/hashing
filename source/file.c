@@ -3,7 +3,7 @@
  *
  * Written by Hampus Fridholm
  *
- * Last updated: 2024-07-02
+ * Last updated: 2024-09-13
  */
 
 #include <stdio.h>
@@ -13,16 +13,16 @@
 #include <sys/stat.h>
 
 /*
- * Get the size of the file at the inputted path
+ * Get the size of the file at the supplied path
  *
- * The function returns the number of bytes the file contains
+ * The function returns the number of bytes in the file
  *
  * PARAMS
  * - const char* filepath | Path to file
  *
  * RETURN (size_t size)
- * - 0  | Error
- * - >0 | Success
+ * - 0  | Failed to open file, or file is empty
+ * - >0 | Number of bytes in file
  */
 size_t file_size_get(const char* filepath)
 {
@@ -47,13 +47,13 @@ size_t file_size_get(const char* filepath)
  * The function returns the number of read bytes
  *
  * PARAMS
- * - void*       pointer  | Pointer to memory to read data to
+ * - void*       pointer  | Pointer to memory buffer
  * - size_t      size     | Number of bytes to read
  * - const char* filepath | Path to file
  *
  * RETURN (same as fread, size_t read_size)
- * - 0  | Error
- * - >0 | Success
+ * - 0  | Failed to read file, or bad input
+ * - >0 | Number of read bytes
  */
 size_t file_read(void* pointer, size_t size, const char* filepath)
 {
@@ -81,45 +81,81 @@ size_t file_read(void* pointer, size_t size, const char* filepath)
  * - both base and name are allocated
  *
  * RETURN (char* fullpath)
+ *
+ * Note: Remember to free the allocated memory
  */
 static char* full_path_create(const char* base, const char* name)
 {
-  size_t bsize = strlen(base);
-  size_t nsize = strlen(name);
+  size_t base_size = strlen(base);
+  size_t name_size = strlen(name);
 
-  char* fullpath = malloc(sizeof(char) * (bsize + nsize + 2));
+  char* fullpath = malloc(sizeof(char) * (base_size + name_size + 2));
 
   sprintf(fullpath, "%s/%s", base, name);
 
   return fullpath;
 }
 
+static void dir_files_alloc(char*** files, size_t* count, const char* dirpath, int depth);
+
+/*
+ * Allocate files in directory child - either a file or a new directory
+ *
+ * PARAMS
+ * - char***     files      | Filepaths
+ * - size_t*     count      | Number of files
+ * - const char* dirpath    | Path to directory
+ * - int         child_type | Type of child - file or dir
+ * - const char* child_name | Name of child - filename or dirname
+ * - int         depth      | Search depth limit
+ */
+static void dir_child_files_alloc(char*** files, size_t* count, const char* dirpath, int child_type, const char* child_name, int depth)
+{
+  if(child_type == DT_REG)
+  {
+    *files = realloc(*files, sizeof(char*) * (*count + 1));
+
+    (*files)[(*count)++] = full_path_create(dirpath, child_name);
+  }
+  else if(child_type == DT_DIR)
+  {
+    char* fullpath = full_path_create(dirpath, child_name);
+
+    if(depth == -1)
+    {
+      dir_files_alloc(files, count, fullpath, -1);
+    }
+    else
+    {
+      dir_files_alloc(files, count, fullpath, depth - 1);
+    }
+
+    free(fullpath);
+  }
+}
+
 /*
  * Allocate file paths from directory to array of filepaths
  *
  * PARAMS
- * - char***     files   | Pointer to paths to files
+ * - char***     files   | Pointer to filepaths
  * - size_t*     count   | Number of files
  * - const char* dirpath | Path to directory
- * - int         depth   | How many directories to open
+ * - int         depth   | Search depth limit
  * 
  * Note:
  * If the depth is -1, search indefinitely
  * If the depth is  0, stop searching
- *
- * RETURN (int status)
- * - 0 | Success!
- * - 1 | Failed to open directory
  */
-static int dir_files_alloc(char*** files, size_t* count, const char* dirpath, int depth)
+static void dir_files_alloc(char*** files, size_t* count, const char* dirpath, int depth)
 {
-  if(depth == 0) return 0;
+  if(depth == 0) return;
 
   struct dirent* dire;
 
   DIR* dirp = opendir(dirpath);
 
-  if(!dirp) return 1;
+  if(!dirp) return;
 
   while((dire = readdir(dirp)) != NULL)
   {
@@ -127,40 +163,20 @@ static int dir_files_alloc(char*** files, size_t* count, const char* dirpath, in
 
     if(strcmp(dire->d_name, "..") == 0) continue;
 
-
-    if(dire->d_type == DT_REG)
-    {
-      *files = realloc(*files, sizeof(char*) * (*count + 1));
-
-      (*files)[(*count)++] = full_path_create(dirpath, dire->d_name);
-    }
-    else if(dire->d_type == DT_DIR)
-    {
-      char* fullpath = full_path_create(dirpath, dire->d_name);
-
-      if(depth == -1)
-      {
-        dir_files_alloc(files, count, fullpath, -1);
-      }
-      else dir_files_alloc(files, count, fullpath, depth - 1);
-
-      free(fullpath);
-    }
+    dir_child_files_alloc(files, count, dirpath, dire->d_type, dire->d_name, depth);
   }
 
   closedir(dirp);
-
-  return 0; // Success!
 }
 
 /*
  * Determine the type of path, either dir or file
  *
  * PARAMS
- * - const char* path | The path to either a dir or a file
+ * - const char* path | Path to either file or dir
  *
  * RETURN (int type)
- * - 0 | Path does not exist
+ * - 0 | Path doesn't exist
  * - 1 | File
  * - 2 | Directory
  */
@@ -181,10 +197,10 @@ static int path_type_get(const char* path)
  * Allocate either path to file or paths to files in directory
  *
  * PARAMS
- * - char***     files | Pointer to paths to files
+ * - char***     files | Pointer to filepaths
  * - size_t*     count | Number of files
  * - const char* path  | Path to either file or dir
- * - int         depth | How many directories to open
+ * - int         depth | Search depth limit
  *
  * EXPECT
  * - files, count and path are allocated
@@ -209,13 +225,11 @@ static void path_files_alloc(char*** files, size_t* count, const char* path, int
 /*
  * Create an array of paths to files based on inputted paths to either file or dir
  *
- * Last updated: 2024-07-02
- *
  * PARAMS
  * - size_t* count      | Pointer to number of files
  * - char**  paths      | Paths to either file or dir
- * - size_t  path_count | Number of paths to either file or dir
- * - int     depth      | How many directories to open
+ * - size_t  path_count | Number of paths
+ * - int     depth      | Search depth limit
  *
  * RETURN (char** files)
  */
@@ -238,7 +252,7 @@ char** files_create(size_t* count, char** paths, size_t path_count, int depth)
  * Get the combined size of data of the inputted files
  *
  * PARAMS
- * - char** files | Paths to files
+ * - char** files | Filepaths
  * - size_t count | Number of files
  *
  * RETURN (size_t size)
@@ -266,9 +280,9 @@ size_t files_size_get(char** files, size_t count)
  * only read the amount of data that the buffer can hold
  *
  * PARAMS
- * - void*  pointer | Pointer to memory to save read data to
+ * - void*  pointer | Pointer to memory buffer
  * - size_t size    | Number of bytes to read
- * - char** files   | Paths to files
+ * - char** files   | Filepaths
  * - size_t count   | Number of files
  *
  * RETURN (size_t read_size)
@@ -283,13 +297,18 @@ size_t files_read(void* pointer, size_t size, char** files, size_t count)
   {
     size_t file_size = file_size_get(files[index]);
 
+    // If the current file would fill up the buffer,
+    // read the last available bytes and return
     if(read_size + file_size > size)
     {
       read_size += file_read(pointer + read_size, size - read_size, files[index]);
       
       break;
     }
-    else read_size += file_read(pointer + read_size, file_size, files[index]);
+    else
+    {
+      read_size += file_read(pointer + read_size, file_size, files[index]);
+    }
   }
 
   return read_size;
@@ -299,8 +318,8 @@ size_t files_read(void* pointer, size_t size, char** files, size_t count)
  * Free the pointers in the files string array
  *
  * PARAMS
- * - char** files | Pointer to strings (pointer to char)
- * - size_t count | Number of pointers
+ * - char** files | Filepaths
+ * - size_t count | Number of files
  */
 void files_free(char** files, size_t count)
 {

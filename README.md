@@ -1,9 +1,9 @@
 # hashing
 
 # Overview
-Imagen you want to hash something using different hashing algorithms, but you don't want to use different programs. This program lets you do exactly that, generate checksums with a specified hash algorithm.
+Imagine you want to hash something using different hashing algorithms, but you don't want to use different programs. This utility let's you do exactly that, generate checksums with a specified hash algorithm.
 
-Every hash algorithm is implemented from scratch and is not written for performance, but to be easily understandable. That is the purpose of this project, to make these hash algorithms easy to understand and replicated.
+Every hash algorithm is implemented from scratch and is not written for performance, but to be easily understood. That is the purpose of this project, to make these hash algorithms easy to understand and replicated.
 
 # Man page
 The program has it's own simple man-page written in Troff. The man-page contains all the necessary information for using the program and it's features, just like any program.
