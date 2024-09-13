@@ -71,27 +71,162 @@ size_t file_read(void* pointer, size_t size, const char* filepath)
 }
 
 /*
- * Concatonate directory base path and name to get full path
+ * Split a string at deliminator into multiple smaller string parts
  *
  * PARAMS
- * - const char* base | Directory path
- * - const char* name | Name of file
+ * - char** string_array | array to store splitted strings to
+ *   - the array should be allocated with size >= split_count
+ *
+ * RETURN (size_t count)
+ * - number of strings successfully splitted
+ */
+static size_t string_split_at_delim(char** string_array, const char* string, const char* delim, size_t split_count)
+{
+  if(!string_array || !string) return 0;
+
+  if(split_count <= 0) return 0;
+
+  char string_copy[strlen(string) + 1]; 
+  strcpy(string_copy, string);
+
+  char* string_token = NULL;
+  
+  string_token = strtok(string_copy, delim);
+
+  size_t index;
+
+  for(index = 0; (index < split_count) && string_token; index++)
+  {
+    string_array[index] = strdup(string_token);
+
+    string_token = strtok(NULL, delim);
+  }
+
+  return index;
+}
+
+/*
+ * Get the number of the specified symbol that are in string
+ *
+ * RETURN (size_t count)
+ */
+static size_t string_symbol_count_get(const char* string, char symbol)
+{
+  size_t count = 0;
+
+  for(size_t index = 0; string[index] != '\0'; index++)
+  {
+    if(string[index] == symbol) count++;
+  }
+  
+  return count;
+}
+
+/*
+ * Free the string array created by string_split_at_delim
+ */
+static void string_array_free(char** string_array, size_t string_count)
+{
+  if(!string_array) return;
+
+  for(size_t index = 0; index < string_count; index++)
+  {
+    if(string_array[index]) free(string_array[index]);
+  }
+}
+
+/*
+ * Filter the strings in a path, by excluding unnecessary directories
+ */
+static size_t path_strings_filter(char** string_array, size_t count)
+{
+  size_t filter_count = 0;
+
+  for(size_t index = 0; index < count; index++)
+  {
+    char* string = string_array[index];
+
+    if((strcmp(string, ".") == 0) || (strcmp(string, "") == 0))
+    {
+      continue;
+    }
+
+    if(string != string_array[filter_count])
+    {
+      strcpy(string_array[filter_count], string);
+    }
+
+    filter_count++;
+  }
+
+  return filter_count;
+}
+
+/*
+ * Concatonate path strings to create the cleaned path
+ */
+static char* path_strings_concat(char** string_array, size_t count, char* path)
+{
+  memset(path, '\0', sizeof(char) * strlen(path));
+
+  for(size_t index = 0; index < count; index++)
+  {
+    char* string = string_array[index];
+
+    if(index > 0) strcat(path, "/");
+
+    strcat(path, string);
+  }
+
+  return path;
+}
+
+/*
+ * Clean path from unnecessary /-symbols and other junk
+ *
+ * This is done by splitting up the path and
+ * putting the valuable pieces back
+ */
+static char* path_clean(char* path)
+{
+  size_t dir_count = string_symbol_count_get(path, '/');
+
+  char* string_array[dir_count + 1];
+
+  size_t split_count = string_split_at_delim(string_array, path, "/", dir_count + 1);
+
+  // 1. Filter out the directory names to keep
+  size_t filter_count = path_strings_filter(string_array, split_count);
+
+  // 2. Concatonate directory names and file name to path
+  path = path_strings_concat(string_array, filter_count, path);
+
+  string_array_free(string_array, split_count);
+
+  return path;
+}
+
+/*
+ * Concatonate directory path and child name to get full path
+ * 
+ * If the dirpath is the current directory, just keep the child name
+ *
+ * PARAMS
+ * - const char* dirpath    | Path to directory
+ * - const char* child_name | Name of child
  *
  * EXPECT
- * - both base and name are allocated
+ * - both dirpath and child_name are allocated
  *
  * RETURN (char* fullpath)
  *
  * Note: Remember to free the allocated memory
  */
-static char* full_path_create(const char* base, const char* name)
+static char* full_path_create(const char* dirpath, const char* child_name)
 {
-  size_t base_size = strlen(base);
-  size_t name_size = strlen(name);
+  char* fullpath = malloc(sizeof(char) * (strlen(dirpath) + strlen(child_name) + 2));
 
-  char* fullpath = malloc(sizeof(char) * (base_size + name_size + 2));
-
-  sprintf(fullpath, "%s/%s", base, name);
+  sprintf(fullpath, "%s/%s", dirpath, child_name);
 
   return fullpath;
 }
@@ -121,14 +256,9 @@ static void dir_child_files_alloc(char*** files, size_t* count, const char* dirp
   {
     char* fullpath = full_path_create(dirpath, child_name);
 
-    if(depth == -1)
-    {
-      dir_files_alloc(files, count, fullpath, -1);
-    }
-    else
-    {
-      dir_files_alloc(files, count, fullpath, depth - 1);
-    }
+    int new_depth = (depth == -1) ? -1 : (depth - 1);
+
+    dir_files_alloc(files, count, fullpath, new_depth);
 
     free(fullpath);
   }
@@ -149,7 +279,7 @@ static void dir_child_files_alloc(char*** files, size_t* count, const char* dirp
  */
 static void dir_files_alloc(char*** files, size_t* count, const char* dirpath, int depth)
 {
-  if(depth == 0) return;
+  if(depth == 0 || depth < -1) return;
 
   struct dirent* dire;
 
@@ -159,9 +289,8 @@ static void dir_files_alloc(char*** files, size_t* count, const char* dirpath, i
 
   while((dire = readdir(dirp)) != NULL)
   {
-    if(strcmp(dire->d_name, ".")  == 0) continue;
-
-    if(strcmp(dire->d_name, "..") == 0) continue;
+    // If the child name starts with a dot, it should not be read
+    if(dire->d_name[0] == '.') continue;
 
     dir_child_files_alloc(files, count, dirpath, dire->d_type, dire->d_name, depth);
   }
@@ -247,6 +376,11 @@ char** files_create(size_t* count, char** paths, size_t path_count, int depth)
   for(size_t index = 0; index < path_count; index++)
   {
     path_files_alloc(&files, count, paths[index], depth);
+  }
+
+  for(size_t index = 0; index < *count; index++)
+  {
+    path_clean(files[index]);
   }
   
   return files;

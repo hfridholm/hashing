@@ -15,7 +15,7 @@ static char args_doc[] = "[FILE...]";
 static struct argp_option options[] =
 {
   { "algorithm", 'a', "STRING", 0, "Hash algorithm to use" },
-  { "depth",     'd', "COUNT",  0, "Search depth in directory" },
+  { "depth",     'd', "COUNT",  0, "Search depth limit" },
   { "concat",    'c', 0,        0, "Concatonate file hashes" },
   { 0 }
 };
@@ -34,7 +34,7 @@ struct args args =
   .args      = NULL,
   .arg_count = 0,
   .alg       = "sha256",
-  .depth     = -1,
+  .depth     = 1,
   .concat    = false
 };
 
@@ -54,7 +54,10 @@ static error_t opt_parse(int key, char* arg, struct argp_state* state)
     case 'd':
       int depth = atoi(arg);
 
-      if(depth != 0) args->depth = depth;
+      if(depth == 0 || depth < -1) argp_usage(state);
+
+      else args->depth = depth;
+
       break;
 
     case 'a':
@@ -224,7 +227,7 @@ int main(int argc, char* argv[])
   char** files = files_create(&count, args.args, args.arg_count, args.depth);
 
   // If no files was supplied, a symbol for no-file is added
-  if(count == 0 && !files)
+  if(args.arg_count == 0 && count == 0)
   {
     files = malloc(sizeof(char*));
 
