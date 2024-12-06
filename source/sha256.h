@@ -1,12 +1,42 @@
 /*
- * The SHA256 algorithm
+ * sha256.h - implementation of the SHA256 algorithm
  *
  * Written by Hampus Fridholm
  *
  * Credit: https://sha256algorithm.com
  *
- * Last updated: 2024-09-13
+ * Last updated: 2024-12-06
+ *
+ *
+ * In main compilation unit; define SHA256_IMPLEMENT
+ *
+ *
+ * These are the available funtions:
+ *
+ * char* sha256(char hash[64], const void* message, size_t size)
  */
+
+/*
+ * From here on, until SHA256_IMPLEMENT,
+ * it is like a normal header file with declarations
+ */
+
+#ifndef SHA256_H
+#define SHA256_H
+
+#include <stddef.h>
+
+extern char* sha256(char hash[64], const void* message, size_t size);
+
+#endif // SHA256_H
+
+/*
+ * This header library file uses _IMPLEMENT guards
+ *
+ * If SHA256_IMPLEMENT is defined, the definitions will be included
+ */
+
+#ifdef SHA256_IMPLEMENT
 
 #include <stdint.h>
 #include <string.h>
@@ -22,7 +52,7 @@
  *
  * RETURN (char* hash)
  */
-static char* hs_hash(char hash[64], const uint32_t hs[8])
+static inline char* sha_hs_hash(char hash[64], const uint32_t hs[8])
 {
   char temp_hash[64 + 1];
 
@@ -36,13 +66,13 @@ static char* hs_hash(char hash[64], const uint32_t hs[8])
   return hash;
 }
 
-#define LSHIFT(a, b) ((a) << (b))
-#define RSHIFT(a, b) ((a) >> (b))
+#define SHA_LSHIFT(a, b) ((a) << (b))
+#define SHA_RSHIFT(a, b) ((a) >> (b))
 
-#define RROTATE(a, b) (RSHIFT(a, b) | LSHIFT(a, 32 - (b)))
+#define SHA_RROTATE(a, b) (SHA_RSHIFT(a, b) | SHA_LSHIFT(a, 32 - (b)))
 
-#define SIG0(x) (RROTATE(x, 7) ^ RROTATE(x, 18) ^ RSHIFT(x, 3))
-#define SIG1(x) (RROTATE(x, 17) ^ RROTATE(x, 19) ^ RSHIFT(x, 10))
+#define SHA_SIG0(x) (SHA_RROTATE(x, 7) ^ SHA_RROTATE(x, 18) ^ SHA_RSHIFT(x, 3))
+#define SHA_SIG1(x) (SHA_RROTATE(x, 17) ^ SHA_RROTATE(x, 19) ^ SHA_RSHIFT(x, 10))
 
 /*
  * Create a 64-entry message schedule array w[0..63] of 32-bit words
@@ -51,7 +81,7 @@ static char* hs_hash(char hash[64], const uint32_t hs[8])
  * - uint32_t w[64]     | The message schedule array w
  * - uint32_t chunk[16] | The chunk from which to create the schedule array
  */
-static void w_create(uint32_t w[64], const uint32_t chunk[16])
+static inline void sha_w_create(uint32_t w[64], const uint32_t chunk[16])
 {
   // 1. Copy 1st chunk into 1st 16 words w[0..15] of the message schedule array
   memcpy(w, chunk, 64);
@@ -59,22 +89,22 @@ static void w_create(uint32_t w[64], const uint32_t chunk[16])
   for(uint8_t index = 16; index < 64; index++)
   {
     uint32_t word1 = w[index - 16];
-    uint32_t word2 = SIG0(w[index - 15]);
+    uint32_t word2 = SHA_SIG0(w[index - 15]);
     uint32_t word3 = w[index - 7];
-    uint32_t word4 = SIG1(w[index - 2]);
+    uint32_t word4 = SHA_SIG1(w[index - 2]);
 
     w[index] = word1 + word2 + word3 + word4;
   }
 }
 
-#define CHOISE(e, f, g) (((e) & (f)) ^ (~(e) & (g)))
-#define MAJORITY(a, b, c) (((a) & (b)) ^ ((a) & (c)) ^ ((b) & (c)))
+#define SHA_CHOISE(e, f, g) (((e) & (f)) ^ (~(e) & (g)))
+#define SHA_MAJORITY(a, b, c) (((a) & (b)) ^ ((a) & (c)) ^ ((b) & (c)))
 
-#define SUM0(x) (RROTATE(x, 2) ^ RROTATE(x, 13) ^ RROTATE(x, 22))
-#define SUM1(x) (RROTATE(x, 6) ^ RROTATE(x, 11) ^ RROTATE(x, 25))
+#define SHA_SUM0(x) (SHA_RROTATE(x, 2) ^ SHA_RROTATE(x, 13) ^ SHA_RROTATE(x, 22))
+#define SHA_SUM1(x) (SHA_RROTATE(x, 6) ^ SHA_RROTATE(x, 11) ^ SHA_RROTATE(x, 25))
 
 // first 32 bits of the fractional parts of the cube roots of the first 64 primes
-static const uint32_t k[64] = {
+static const uint32_t SHA_K[64] = {
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
   0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
   0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
@@ -100,7 +130,7 @@ static const uint32_t k[64] = {
  * - uint32_t hs[8]       | The "will be updated"-"h" values
  * - const uint32_t w[64] | The 64-entry message schedule array
  */
-void hs_w_update(uint32_t hs[8], const uint32_t w[64])
+static inline void sha_hs_w_update(uint32_t hs[8], const uint32_t w[64])
 {
   // Initialize working variables to initial hash value
   uint32_t a = hs[0];
@@ -115,13 +145,13 @@ void hs_w_update(uint32_t hs[8], const uint32_t w[64])
   // Update working variables as:
   for(uint8_t index = 0; index < 64; index++)
   {
-    uint32_t majority = MAJORITY(a, b, c);
-    uint32_t choise   = CHOISE(e, f, g);
+    uint32_t majority = SHA_MAJORITY(a, b, c);
+    uint32_t choise   = SHA_CHOISE(e, f, g);
 
-    uint32_t sum0 = SUM0(a);
-    uint32_t sum1 = SUM1(e);
+    uint32_t sum0 = SHA_SUM0(a);
+    uint32_t sum1 = SHA_SUM1(e);
 
-    uint32_t t1 = h + sum1 + choise + k[index] + w[index];
+    uint32_t t1 = h + sum1 + choise + SHA_K[index] + w[index];
     uint32_t t2 = sum0 + majority;
 
     h = g;
@@ -152,15 +182,15 @@ void hs_w_update(uint32_t hs[8], const uint32_t w[64])
  * - uint32_t hs[8]           | The "will be updated" "h"-values
  * - const uint32_t chunk[16] | The current chunk from the block
  */
-static void hs_chunk_update(uint32_t hs[8], const uint32_t chunk[16])
+static inline void sha_hs_chunk_update(uint32_t hs[8], const uint32_t chunk[16])
 {
   uint32_t w[64];
 
   // 1. Create a 64-entry message schedule array w[0..63] of 32-bit words
-  w_create(w, chunk);
+  sha_w_create(w, chunk);
 
   // 2. Update the "h"-values with the created message schedule array
-  hs_w_update(hs, w);
+  sha_hs_w_update(hs, w);
 }
 
 /*
@@ -168,13 +198,16 @@ static void hs_chunk_update(uint32_t hs[8], const uint32_t chunk[16])
  *
  * BIT refers to the bit in the words at a specific index
  */
-// Note: (BIT >> 5) is equivalent to (BIT / 32)
-#define BIT_WORD(WORDS, BIT) (WORDS)[(BIT) >> 5]
-// Note: (BIT & 0b11111) is equivalent to (BIT % 32)
-#define WORD_BIT(BIT) (31 - ((BIT) & 0b11111))
 
-#define BIT_SET(WORDS, BIT) (BIT_WORD(WORDS, BIT) |=  LSHIFT(1, WORD_BIT(BIT)))
-#define BIT_OFF(WORDS, BIT) (BIT_WORD(WORDS, BIT) &= ~LSHIFT(1, WORD_BIT(BIT)))
+// Note: (BIT >> 5) is equivalent to (BIT / 32)
+#define SHA_BIT_WORD(WORDS, BIT) (WORDS)[(BIT) >> 5]
+
+// Note: (BIT & 0b11111) is equivalent to (BIT % 32)
+#define SHA_WORD_BIT(BIT) (31 - ((BIT) & 0b11111))
+
+#define SHA_BIT_SET(WORDS, BIT) (SHA_BIT_WORD(WORDS, BIT) |=  SHA_LSHIFT(1, SHA_WORD_BIT(BIT)))
+
+#define SHA_BIT_OFF(WORDS, BIT) (SHA_BIT_WORD(WORDS, BIT) &= ~SHA_LSHIFT(1, SHA_WORD_BIT(BIT)))
 
 /*
  * Prepend the binary representation of the message to the message block
@@ -184,7 +217,7 @@ static void hs_chunk_update(uint32_t hs[8], const uint32_t chunk[16])
  * - const void* message | The message to prepend
  * - size_t size         | The amount of bytes (8 bits)
  */
-static void block_message_prepend(uint32_t* block, const void* message, size_t size)
+static inline void sha_block_message_prepend(uint32_t* block, const void* message, size_t size)
 {
   for(size_t index = 0; index < size; index++)
   {
@@ -192,11 +225,11 @@ static void block_message_prepend(uint32_t* block, const void* message, size_t s
     {
       char word = ((char*) message)[index];
 
-      if(word & LSHIFT(1, (7 - bit)))
+      if(word & SHA_LSHIFT(1, (7 - bit)))
       {
-        BIT_SET(block, (index * 8) + bit);
+        SHA_BIT_SET(block, (index * 8) + bit);
       }
-      else BIT_OFF(block, (index * 8) + bit);
+      else SHA_BIT_OFF(block, (index * 8) + bit);
     }
   }
 }
@@ -206,7 +239,7 @@ static void block_message_prepend(uint32_t* block, const void* message, size_t s
  *
  * This is the equivalent to ceil(size / 64)
  */
-#define INITIAL_CHUNKS(SIZE) (((SIZE) & 0b111111) ? ((SIZE) >> 6) + 1 : (SIZE) >> 6)
+#define SHA_INITIAL_CHUNKS(SIZE) (((SIZE) & 0b111111) ? ((SIZE) >> 6) + 1 : (SIZE) >> 6)
 
 /*
  * Check if an extra chunk is needed
@@ -214,12 +247,13 @@ static void block_message_prepend(uint32_t* block, const void* message, size_t s
  * Either if the message would occupy the 1-bit and the length bits
  *     or if the message already occupies a whole chunk
  */
-#define EXTRA_CHUNK(SIZE) ((((SIZE) & 0b111000) == 0b111000) || ((SIZE & 0b111111) == 0b000000))
+#define SHA_EXTRA_CHUNK(SIZE) \
+  ((((SIZE) & 0b111000) == 0b111000) || (((SIZE) & 0b111111) == 0b000000))
 
+#define SHA_CHUNKS(SIZE) \
+  (SHA_EXTRA_CHUNK(SIZE) ? (SHA_INITIAL_CHUNKS(SIZE) + 1) :  SHA_INITIAL_CHUNKS(SIZE))
 
-#define CHUNKS(SIZE) (EXTRA_CHUNK(SIZE) ? (INITIAL_CHUNKS(SIZE) + 1) :  INITIAL_CHUNKS(SIZE))
-
-#define ZEROS(SIZE, CHUNKS) (((CHUNKS) * 64 - (SIZE)) * 8 - 64 - 1)
+#define SHA_ZEROS(SIZE, CHUNKS) (((CHUNKS) * 64 - (SIZE)) * 8 - 64 - 1)
 
 /*
  * Create the message block needed to generate the SHA256 hash
@@ -231,18 +265,18 @@ static void block_message_prepend(uint32_t* block, const void* message, size_t s
  * - const void* message | The message to hash
  * - size_t size         | The amount of bytes (8 bits)
  */
-static void block_create(uint32_t* block, size_t chunks, uint16_t zeros, const void* message, size_t size)
+static inline void sha_block_create(uint32_t* block, size_t chunks, uint16_t zeros, const void* message, size_t size)
 {
   // 1. Copy the encoded message to the message block
-  block_message_prepend(block, message, size);
+  sha_block_message_prepend(block, message, size);
 
   // 2. Append a single '1' to the encoded message
-  BIT_SET(block, size * 8);
+  SHA_BIT_SET(block, size * 8);
 
   // 3. Add zeros between the encoded message and the length integer
   for(size_t index = 0; index < zeros; index++)
   {
-    BIT_OFF(block, size * 8 + 1 + index);
+    SHA_BIT_OFF(block, size * 8 + 1 + index);
   }
   // 4. Copy binary representation of length to end of block
   // The length is the amount of bits (1 byte = 8 bits)
@@ -262,7 +296,7 @@ static void block_create(uint32_t* block, size_t chunks, uint16_t zeros, const v
  *
  * RETURN (char* hash)
  */
-static char* block_hash(char hash[64], const uint32_t* block, size_t chunks)
+static inline char* sha_block_hash(char hash[64], const uint32_t* block, size_t chunks)
 {
   // first 32 bits of the fractional parts of the square roots of the first 8 primes
   uint32_t hs[8] = {
@@ -280,10 +314,10 @@ static char* block_hash(char hash[64], const uint32_t* block, size_t chunks)
   for(size_t index = 0; index < chunks; index++)
   {
     // block + (index * 16) points to the current chunk
-    hs_chunk_update(hs, block + (index * 16));
+    sha_hs_chunk_update(hs, block + (index * 16));
   }
 
-  return hs_hash(hash, hs); 
+  return sha_hs_hash(hash, hs); 
 }
 
 /*
@@ -300,16 +334,18 @@ static char* block_hash(char hash[64], const uint32_t* block, size_t chunks)
  */
 char* sha256(char hash[64], const void* message, size_t size)
 {
-  size_t   chunks = CHUNKS(size);
-  uint16_t zeros  = ZEROS (size, chunks);
+  size_t   chunks = SHA_CHUNKS(size);
+  uint16_t zeros  = SHA_ZEROS (size, chunks);
 
   uint32_t* block = malloc(sizeof(uint32_t) * chunks * 16);
 
-  block_create(block, chunks, zeros, message, size);
+  sha_block_create(block, chunks, zeros, message, size);
 
-  hash = block_hash(hash, block, chunks);
+  hash = sha_block_hash(hash, block, chunks);
 
   free(block);
 
   return hash;
 }
+
+#endif // SHA256_IMPLEMENT

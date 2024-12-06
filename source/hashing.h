@@ -27,9 +27,4 @@ extern size_t file_size_get(const char* filepath);
 
 extern size_t file_read(void* pointer, size_t size, const char* filepath);
 
-
-extern char* sha256(char hash[64], const void* message, size_t size);
-
-extern char* md5(char hash[32], const void* message, size_t size);
-
 #endif // HASHING_H

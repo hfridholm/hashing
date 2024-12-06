@@ -5,18 +5,49 @@
  *
  * Credit: https://en.wikipedia.org/wiki/MD5
  *
- * Last updated: 2024-09-13
+ * Last updated: 2024-12-06
+ *
+ *
+ * In main compilation unit; define MD5_IMPLEMENT
+ *
+ *
+ * These are the available funtions:
+ *
+ * char* md5(char hash[32], const void* message, size_t size)
  */
+
+/*
+ * From here on, until MD5_IMPLEMENT,
+ * it is like a normal header file with declarations
+ */
+
+#ifndef MD5_H
+#define MD5_H
+
+#include <stddef.h>
+
+extern char* md5(char hash[32], const void* message, size_t size);
+
+#endif // MD5_H
+
+/*
+ * This header library file uses _IMPLEMENT guards
+ *
+ * If MD5_IMPLEMENT is defined, the definitions will be included
+ */
+
+#ifdef MD5_IMPLEMENT
 
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
-#define LENDIAN(WORD) ((((WORD) << 24) & 0xff000000) | \
-                       (((WORD) <<  8) & 0x00ff0000) | \
-                       (((WORD) >>  8) & 0x0000ff00) | \
-                       (((WORD) >> 24) & 0x000000ff))
+#define MD5_LENDIAN(WORD) \
+  ((((WORD) << 24) & 0xff000000) | \
+   (((WORD) <<  8) & 0x00ff0000) | \
+   (((WORD) >>  8) & 0x0000ff00) | \
+   (((WORD) >> 24) & 0x000000ff))
 
 /*
  * Create a MD5 hash from the inputted abcd-values
@@ -27,13 +58,13 @@
  *
  * RETURN (char* hash)
  */
-static char* abcd_hash(char hash[32], const uint32_t abcd[4])
+static inline char* md5_abcd_hash(char hash[32], const uint32_t abcd[4])
 {
   char temp_hash[32 + 1];
 
   for(uint8_t index = 0; index < 4; index++)
   {
-    sprintf(temp_hash + (index * 8), "%08x", LENDIAN(abcd[index]));
+    sprintf(temp_hash + (index * 8), "%08x", MD5_LENDIAN(abcd[index]));
   }
 
   strncpy(hash, temp_hash, sizeof(char) * 32);
@@ -41,12 +72,12 @@ static char* abcd_hash(char hash[32], const uint32_t abcd[4])
   return hash;
 }
 
-#define LSHIFT(a, b) ((a) << (b))
-#define RSHIFT(a, b) ((a) >> (b))
+#define MD5_LSHIFT(a, b) ((a) << (b))
+#define MD5_RSHIFT(a, b) ((a) >> (b))
 
-#define LROTATE(a, b) (LSHIFT(a, b) | RSHIFT(a, 32 - (b)))
+#define MD5_LROTATE(a, b) (MD5_LSHIFT(a, b) | MD5_RSHIFT(a, 32 - (b)))
 
-static const uint32_t k[64] = {
+static const uint32_t MD5_K[64] = {
   0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee,
   0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
   0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be,
@@ -65,17 +96,12 @@ static const uint32_t k[64] = {
   0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
 };
 
-const uint8_t s[16] = {
+const uint8_t MD5_S[16] = {
   7, 12, 17, 22,
   5,  9, 14, 20,
   4, 11, 16, 23,
   6, 10, 15, 21
 };
-
-#define F(B, C, D) (((B) & (C)) | (~(B) & (D)))
-#define G(B, C, D) (((B) & (D)) | ((C) & ~(D)))
-#define H(B, C, D) ((B) ^ (C) ^ (D))
-#define I(B, C, D) ((C) ^ ((B) | ~(D)))
 
 /*
  * Update the abcd-values with the bits in the inputted chunk
@@ -84,7 +110,7 @@ const uint8_t s[16] = {
  * - uint32_t abcd[4]         | The "will be updated" abcd-values
  * - const uint32_t chunk[16] | The current chunk from the block
  */
-static void abcd_chunk_update(uint32_t abcd[4], const uint32_t chunk[16])
+static inline void md5_abcd_chunk_update(uint32_t abcd[4], const uint32_t chunk[16])
 {
   // Initialize hash value for this chunk:
   uint32_t a = abcd[0];
@@ -99,34 +125,35 @@ static void abcd_chunk_update(uint32_t abcd[4], const uint32_t chunk[16])
 
     if(i >= 0 && i < 16)
     {
-      f = F(b, c, d);
+      f = (b & c) | (~b & d);
       g = i;
     }
     else if(i >= 16 && i < 32)
     {
-      f = G(b, c, d);
+      f = (b & d) | (c & ~d);
       g = ((5 * i) + 1) & 0b1111;
     }
     else if(i >= 32 && i < 48)
     {
-      f = H(b, c, d);
+      f = (b ^ c ^ d);
       g = ((3 * i) + 5) & 0b1111;
     }
     else // if(i >= 48 && i < 63)
     {
-      f = I(b, c, d);
+      f = (c ^ (b | ~d));
       g = (7 * i) & 0b1111;
     }
 
     uint8_t si = ((i >> 4) << 2) + (i & 0b11);
 
-    f += a + k[i] + chunk[g];
+    f += a + MD5_K[i] + chunk[g];
 
     a = d;
     d = c;
     c = b;
-    b += LROTATE(f, s[si]);
+    b += MD5_LROTATE(f, MD5_S[si]);
   }
+
   // Add this chunk's hash to result so far:
   abcd[0] += a;
   abcd[1] += b;
@@ -139,13 +166,16 @@ static void abcd_chunk_update(uint32_t abcd[4], const uint32_t chunk[16])
  *
  * BIT refers to the bit in the words at a specific index
  */
-// Note: (BIT >> 5) is equivalent to (BIT / 32)
-#define BIT_WORD(WORDS, BIT) (WORDS)[(BIT) >> 5]
-// Note: (BIT & 0b11111) is equivalent to (BIT % 32)
-#define WORD_BIT(BIT) (31 - ((BIT) & 0b11111))
 
-#define BIT_SET(WORDS, BIT) (BIT_WORD(WORDS, BIT) |=  LSHIFT(1, WORD_BIT(BIT)))
-#define BIT_OFF(WORDS, BIT) (BIT_WORD(WORDS, BIT) &= ~LSHIFT(1, WORD_BIT(BIT)))
+// Note: (BIT >> 5) is equivalent to (BIT / 32)
+#define MD5_BIT_WORD(WORDS, BIT) (WORDS)[(BIT) >> 5]
+
+// Note: (BIT & 0b11111) is equivalent to (BIT % 32)
+#define MD5_WORD_BIT(BIT) (31 - ((BIT) & 0b11111))
+
+#define MD5_BIT_SET(WORDS, BIT) (MD5_BIT_WORD(WORDS, BIT) |=  MD5_LSHIFT(1, MD5_WORD_BIT(BIT)))
+
+#define MD5_BIT_OFF(WORDS, BIT) (MD5_BIT_WORD(WORDS, BIT) &= ~MD5_LSHIFT(1, MD5_WORD_BIT(BIT)))
 
 /*
  * Prepend the binary representation of the message to the message block
@@ -155,7 +185,7 @@ static void abcd_chunk_update(uint32_t abcd[4], const uint32_t chunk[16])
  * - const void* message | The message to prepend
  * - size_t size         | The amount of bytes (8 bits)
  */
-static void block_message_prepend(uint32_t* block, const void* message, size_t size)
+static inline void md5_block_message_prepend(uint32_t* block, const void* message, size_t size)
 {
   for(size_t index = 0; index < size; index++)
   {
@@ -163,11 +193,11 @@ static void block_message_prepend(uint32_t* block, const void* message, size_t s
     {
       char word = ((char*) message)[index];
 
-      if(word & LSHIFT(1, (7 - bit)))
+      if(word & MD5_LSHIFT(1, (7 - bit)))
       {
-        BIT_SET(block, (index * 8) + bit);
+        MD5_BIT_SET(block, (index * 8) + bit);
       }
-      else BIT_OFF(block, (index * 8) + bit);
+      else MD5_BIT_OFF(block, (index * 8) + bit);
     }
   }
 }
@@ -177,7 +207,7 @@ static void block_message_prepend(uint32_t* block, const void* message, size_t s
  *
  * This is the equivalent to ceil(size / 64)
  */
-#define INITIAL_CHUNKS(SIZE) (((SIZE) & 0b111111) ? ((SIZE) >> 6) + 1 : (SIZE) >> 6)
+#define MD5_INITIAL_CHUNKS(SIZE) (((SIZE) & 0b111111) ? ((SIZE) >> 6) + 1 : (SIZE) >> 6)
 
 /*
  * Check if an extra chunk is needed
@@ -185,12 +215,13 @@ static void block_message_prepend(uint32_t* block, const void* message, size_t s
  * Either if the message would occupy the 1-bit and the length bits
  *     or if the message already occupies a whole chunk
  */
-#define EXTRA_CHUNK(SIZE) ((((SIZE) & 0b111000) == 0b111000) || ((SIZE & 0b111111) == 0b000000))
+#define MD5_EXTRA_CHUNK(SIZE) \
+  ((((SIZE) & 0b111000) == 0b111000) || (((SIZE) & 0b111111) == 0b000000))
 
+#define MD5_CHUNKS(SIZE) \
+  (MD5_EXTRA_CHUNK(SIZE) ? (MD5_INITIAL_CHUNKS(SIZE) + 1) :  MD5_INITIAL_CHUNKS(SIZE))
 
-#define CHUNKS(SIZE) (EXTRA_CHUNK(SIZE) ? (INITIAL_CHUNKS(SIZE) + 1) :  INITIAL_CHUNKS(SIZE))
-
-#define ZEROS(SIZE, CHUNKS) (((CHUNKS) * 64 - (SIZE)) * 8 - 64 - 1)
+#define MD5_ZEROS(SIZE, CHUNKS) (((CHUNKS) * 64 - (SIZE)) * 8 - 64 - 1)
 
 /*
  * Create the message block needed to generate the MD5 hash
@@ -202,24 +233,24 @@ static void block_message_prepend(uint32_t* block, const void* message, size_t s
  * - const void* message | The message to hash
  * - size_t size         | The amount of bytes (8 bits)
  */
-static void block_create(uint32_t* block, size_t chunks, uint16_t zeros, const void* message, size_t size)
+static inline void md5_block_create(uint32_t* block, size_t chunks, uint16_t zeros, const void* message, size_t size)
 {
   // 1. Copy the encoded message to the message block
-  block_message_prepend(block, message, size);
+  md5_block_message_prepend(block, message, size);
 
   // 2. Append a single '1' to the encoded message
-  BIT_SET(block, size * 8);
+  MD5_BIT_SET(block, size * 8);
 
   // 3. Add zeros between the encoded message and the length integer
   for(size_t index = 0; index < zeros; index++)
   {
-    BIT_OFF(block, size * 8 + 1 + index);
+    MD5_BIT_OFF(block, size * 8 + 1 + index);
   }
 
   // 5. Convert 32-bit words to little endian 32-bit words
   for(size_t index = 0; index < (chunks * 16) - 2; index++)
   {
-    block[index] = LENDIAN(block[index]);
+    block[index] = MD5_LENDIAN(block[index]);
   }
 
   // 6. Copy binary representation of length to end of block
@@ -240,7 +271,7 @@ static void block_create(uint32_t* block, size_t chunks, uint16_t zeros, const v
  *
  * RETURN (char* hash)
  */
-static char* block_hash(char hash[32], const uint32_t* block, size_t chunks)
+static inline char* md5_block_hash(char hash[32], const uint32_t* block, size_t chunks)
 {
   uint32_t abcd[4] = {
     0x67452301,
@@ -252,10 +283,10 @@ static char* block_hash(char hash[32], const uint32_t* block, size_t chunks)
   for(size_t index = 0; index < chunks; index++)
   {
     // block + (index * 16) points to the current chunk
-    abcd_chunk_update(abcd, block + (index * 16));
+    md5_abcd_chunk_update(abcd, block + (index * 16));
   }
 
-  return abcd_hash(hash, abcd);
+  return md5_abcd_hash(hash, abcd);
 }
 
 /*
@@ -272,16 +303,18 @@ static char* block_hash(char hash[32], const uint32_t* block, size_t chunks)
  */
 char* md5(char hash[32], const void* message, size_t size)
 {
-  size_t   chunks = CHUNKS(size);
-  uint16_t zeros  = ZEROS (size, chunks);
+  size_t   chunks = MD5_CHUNKS(size);
+  uint16_t zeros  = MD5_ZEROS (size, chunks);
 
   uint32_t* block = malloc(sizeof(uint32_t) * chunks * 16);
 
-  block_create(block, chunks, zeros, message, size);
+  md5_block_create(block, chunks, zeros, message, size);
 
-  hash = block_hash(hash, block, chunks);
+  hash = md5_block_hash(hash, block, chunks);
 
   free(block);
 
   return hash;
 }
+
+#endif // MD5_IMPLEMENT

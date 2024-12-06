@@ -6,6 +6,12 @@
  * Last updated: 2024-09-13
  */
 
+#define SHA256_IMPLEMENT
+#include "sha256.h"
+
+#define MD5_IMPLEMENT
+#include "md5.h"
+
 #include "hashing.h"
 
 static char doc[] = "hashing - compute hash algorithm checksum";
