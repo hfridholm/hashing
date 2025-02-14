@@ -111,9 +111,7 @@ extern int    dir_file_rename(const char* dirpath, const char* old_name, const c
 #include <sys/stat.h>
 
 /*
- * Get the size of the file at the supplied path
- *
- * The function returns the number of bytes in the file
+ * Get number of bytes in file
  *
  * PARAMS
  * - const char* filepath | Path to file
@@ -126,7 +124,7 @@ size_t file_size_get(const char* filepath)
 {
   FILE* stream = fopen(filepath, "rb");
 
-  if(!stream) return 0;
+  if (!stream) return 0;
 
   fseek(stream, 0, SEEK_END); 
 
@@ -140,6 +138,11 @@ size_t file_size_get(const char* filepath)
 }
 
 /*
+ * Remove file
+ *
+ * PARAMS
+ * - const char* filepath | Path to file
+ *
  * RETURN (same as remove)
  */
 int file_remove(const char* filepath)
@@ -148,6 +151,12 @@ int file_remove(const char* filepath)
 }
 
 /*
+ * Rename, or move, file
+ *
+ * PARAMS
+ * - const char* old_filepath | Old path to file
+ * - const char* new_filepath | New path to file
+ *
  * RETURN (same as rename)
  */
 int file_rename(const char* old_filepath, const char* new_filepath)
@@ -157,8 +166,6 @@ int file_rename(const char* old_filepath, const char* new_filepath)
 
 /*
  * Read a number of bytes from file to memory at pointer
- *
- * The function returns the number of read bytes
  *
  * PARAMS
  * - void*       pointer  | Pointer to memory buffer
@@ -171,11 +178,11 @@ int file_rename(const char* old_filepath, const char* new_filepath)
  */
 size_t file_read(void* pointer, size_t size, const char* filepath)
 {
-  if(!pointer) return 0;
+  if (!pointer) return 0;
 
   FILE* stream = fopen(filepath, "rb");
 
-  if(!stream) return 0;
+  if (!stream) return 0;
 
   size_t read_size = fread(pointer, 1, size, stream);
 
@@ -188,21 +195,21 @@ size_t file_read(void* pointer, size_t size, const char* filepath)
  * Write a number of bytes from memory at pointer to file
  *
  * PARAMS
- * - const void* pointer  | Address to write data to
+ * - const void* pointer  | Pointer to memory to read from
  * - size_t      size     | Number of bytes to write
  * - const char* filepath | Path to file
  *
  * RETURN (same as fwrite, size_t write_size)
- * - 0  | Error
+ * - 0  | Failed to open file or bad pointer
  * - >0 | The number of written bytes
  */
 size_t file_write(const void* pointer, size_t size, const char* filepath)
 {
-  if(!pointer) return 0;
+  if (!pointer) return 0;
 
   FILE* stream = fopen(filepath, "wb");
 
-  if(!stream) return 0;
+  if (!stream) return 0;
 
   size_t write_size = fwrite(pointer, 1, size, stream);
 
@@ -212,13 +219,15 @@ size_t file_write(const void* pointer, size_t size, const char* filepath)
 }
 
 /*
+ * Get the names of the files in directory
+ *
  * PARAMS
- * - char**      names   |
- * - size_t*     count   |
- * - const char* dirpath |
+ * - char**      names   | Names of files
+ * - size_t*     count   | Number of names
+ * - const char* dirpath | Path to directory
  * 
  * RETURN (int status)
- * - 0 | Success!
+ * - 0 | Success
  * - 1 | Failed to open directory
  */
 int dir_file_names_get(char*** names, size_t* count, const char* dirpath)
@@ -227,20 +236,20 @@ int dir_file_names_get(char*** names, size_t* count, const char* dirpath)
 
   DIR* dirp = opendir(dirpath);
 
-  if(dirp == NULL) return 1;
+  if (!dirp) return 1;
 
-  while((dire = readdir(dirp)) != NULL)
+  while ((dire = readdir(dirp)) != NULL)
   {
-    if(!strcmp(dire->d_name, ".")) continue;
-
-    if(!strcmp(dire->d_name, "..")) continue;
-
-
-    if(dire->d_type != DT_REG) continue;
+    if (strcmp(dire->d_name, ".")  == 0 ||
+        strcmp(dire->d_name, "..") == 0 ||
+        dire->d_type != DT_REG)
+    {
+      continue;
+    }
 
     char** new_names = realloc(*names, sizeof(char*) * ((*count) + 1));
 
-    if(!new_names)
+    if (!new_names)
     {
       closedir(dirp);
 
@@ -262,13 +271,13 @@ int dir_file_names_get(char*** names, size_t* count, const char* dirpath)
  * Read from file inside directory
  *
  * PARAMS
- * - const void* pointer | Address to read data from
+ * - void*       pointer | Pointer to memory to write to
  * - size_t      size    | Number of bytes to read
  * - const char* dirpath | Path to directory
  * - const char* name    | Name of file
  *
  * RETURN (same as fread, size_t read_size)
- * - 0  | Error
+ * - 0  | Failed to read file, or bad input
  * - >0 | Number of read bytes
  */
 size_t dir_file_read(void* pointer, size_t size, const char* dirpath, const char* name)
@@ -286,13 +295,13 @@ size_t dir_file_read(void* pointer, size_t size, const char* dirpath, const char
  * Write to file inside directory
  *
  * PARAMS
- * - const void* pointer | Address to write data to
+ * - const void* pointer | Pointer to memory to read from
  * - size_t      size    | Number of bytes to write
  * - const char* dirpath | Path to directory
  * - const char* name    | Name of file
  *
  * RETURN (same as fwrite, size_t write_size)
- * - 0  | Error
+ * - 0  | Failed to open file or bad pointer
  * - >0 | The number of written bytes
  */
 size_t dir_file_write(const void* pointer, size_t size, const char* dirpath, const char* name)
@@ -314,7 +323,7 @@ size_t dir_file_write(const void* pointer, size_t size, const char* dirpath, con
  * - const char* name    | Name of file
  *
  * RETURN (size_t size)
- * - 0  | Error
+ * - 0  | Failed to open file, or file is empty
  * - >0 | Number of bytes in file
  */
 size_t dir_file_size_get(const char* dirpath, const char* name)
@@ -329,6 +338,12 @@ size_t dir_file_size_get(const char* dirpath, const char* name)
 }
 
 /*
+ * Remove file in directory
+ *
+ * PARAMS
+ * - const char* dirpath | Path to directory
+ * - const char* name    | Name of file
+ *
  * RETURN (same as remove)
  */
 int dir_file_remove(const char* dirpath, const char* name)
@@ -343,7 +358,12 @@ int dir_file_remove(const char* dirpath, const char* name)
 }
 
 /*
- * Rename 
+ * Rename, or move, file in directory
+ *
+ * PARAMS
+ * - const char* dirpath  | Path to directory
+ * - const char* old_name | Old name of file
+ * - const char* new_name | New name of file
  *
  * RETURN (same as rename)
  */
@@ -378,9 +398,9 @@ int dir_file_rename(const char* dirpath, const char* old_name, const char* new_n
  */
 static inline size_t string_split_at_delim(char** string_array, const char* string, const char* delim, size_t split_count)
 {
-  if(!string_array || !string) return 0;
+  if (!string_array || !string) return 0;
 
-  if(split_count <= 0) return 0;
+  if (split_count <= 0) return 0;
 
   char string_copy[strlen(string) + 1]; 
   strcpy(string_copy, string);
@@ -391,7 +411,7 @@ static inline size_t string_split_at_delim(char** string_array, const char* stri
 
   size_t index;
 
-  for(index = 0; (index < split_count) && string_token; index++)
+  for (index = 0; (index < split_count) && string_token; index++)
   {
     string_array[index] = strdup(string_token);
 
@@ -410,9 +430,9 @@ static inline size_t string_symbol_count_get(const char* string, char symbol)
 {
   size_t count = 0;
 
-  for(size_t index = 0; string[index] != '\0'; index++)
+  for (size_t index = 0; string[index] != '\0'; index++)
   {
-    if(string[index] == symbol) count++;
+    if (string[index] == symbol) count++;
   }
   
   return count;
@@ -421,33 +441,39 @@ static inline size_t string_symbol_count_get(const char* string, char symbol)
 /*
  * Free the string array created by string_split_at_delim
  */
-static inline void string_array_free(char** string_array, size_t string_count)
+static inline void string_array_free(char** string_array, size_t count)
 {
-  if(!string_array) return;
+  if (!string_array) return;
 
-  for(size_t index = 0; index < string_count; index++)
+  for (size_t index = 0; index < count; index++)
   {
-    if(string_array[index]) free(string_array[index]);
+    char* string = string_array[index];
+
+    if (string) free(string);
   }
 }
 
 /*
  * Filter the strings in a path, by excluding unnecessary directories
+ *
+ * RETURN (size_t new_count)
+ * - new count of strings, after filtering
  */
 static inline size_t path_strings_filter(char** string_array, size_t count)
 {
   size_t filter_count = 0;
 
-  for(size_t index = 0; index < count; index++)
+  for (size_t index = 0; index < count; index++)
   {
     char* string = string_array[index];
 
-    if((strcmp(string, ".") == 0) || (strcmp(string, "") == 0))
+    if (strcmp(string, ".") == 0 ||
+        strcmp(string, "")  == 0)
     {
       continue;
     }
 
-    if(string != string_array[filter_count])
+    if (string != string_array[filter_count])
     {
       strcpy(string_array[filter_count], string);
     }
@@ -460,16 +486,18 @@ static inline size_t path_strings_filter(char** string_array, size_t count)
 
 /*
  * Concatonate path strings to create the cleaned path
+ *
+ * RETURN (char* path)
  */
 static inline char* path_strings_concat(char** string_array, size_t count, char* path)
 {
   memset(path, '\0', sizeof(char) * strlen(path));
 
-  for(size_t index = 0; index < count; index++)
+  for (size_t index = 0; index < count; index++)
   {
     char* string = string_array[index];
 
-    if(index > 0) strcat(path, "/");
+    if (index > 0) strcat(path, "/");
 
     strcat(path, string);
   }
@@ -509,7 +537,7 @@ char* path_clean(char* path)
  *
  * PARAMS
  * - const char* dirpath    | Path to directory
- * - const char* child_name | Name of child
+ * - const char* child_name | Name of child (either file or dir)
  *
  * EXPECT
  * - both dirpath and child_name are allocated
@@ -533,40 +561,45 @@ static inline int dir_files_get(char*** files, size_t* count, const char* dirpat
  * Allocate files in directory child - either a file or a new directory
  *
  * PARAMS
- * - char***     files      | Filepaths
+ * - char***     files      | Pointer to filepaths
  * - size_t*     count      | Number of files
  * - const char* dirpath    | Path to directory
  * - int         child_type | Type of child - file or dir
  * - const char* child_name | Name of child - filename or dirname
  * - int         depth      | Search depth limit
+ *
+ * RETURN (int file_amount)
+ * -  0 | Path not to file or dir
+ * - >0 | Number of files
  */
 static inline int dir_child_files_get(char*** files, size_t* count, const char* dirpath, int child_type, const char* child_name, int depth)
 {
-  if(child_type == DT_REG)
+  switch (child_type)
   {
-    *files = realloc(*files, sizeof(char*) * (*count + 1));
+    case DT_REG:
+      *files = realloc(*files, sizeof(char*) * (*count + 1));
 
-    (*files)[(*count)++] = full_path_create(dirpath, child_name);
+      (*files)[(*count)++] = full_path_create(dirpath, child_name);
 
-    return 1;
+      return 1;
+
+    case DT_DIR:
+      char* fullpath = full_path_create(dirpath, child_name);
+
+      int new_depth = (depth == -1) ? -1 : (depth - 1);
+
+      int file_amount = dir_files_get(files, count, fullpath, new_depth);
+
+      free(fullpath);
+
+      return file_amount;
+
+    default: return 0;
   }
-  else if(child_type == DT_DIR)
-  {
-    char* fullpath = full_path_create(dirpath, child_name);
-
-    int new_depth = (depth == -1) ? -1 : (depth - 1);
-
-    int file_amount = dir_files_get(files, count, fullpath, new_depth);
-
-    free(fullpath);
-
-    return file_amount;
-  }
-  else return 0;
 }
 
 /*
- * Allocate file paths from directory to array of filepaths
+ * Get and allocate array of files in directory, recursivly
  *
  * PARAMS
  * - char***     files   | Pointer to filepaths
@@ -577,23 +610,27 @@ static inline int dir_child_files_get(char*** files, size_t* count, const char* 
  * Note:
  * If the depth is -1, search indefinitely
  * If the depth is  0, stop searching
+ *
+ * RETURN (int file_amount)
+ * -  0 | Path not to dir, bad input or no files
+ * - >0 | Number of files
  */
 static inline int dir_files_get(char*** files, size_t* count, const char* dirpath, int depth)
 {
-  if(depth == 0 || depth < -1) return 0;
+  if (depth == 0 || depth < -1) return 0;
 
   struct dirent* dire;
 
   DIR* dirp = opendir(dirpath);
 
-  if(!dirp) return 0;
+  if (!dirp) return 0;
 
   int file_amount = 0;
 
-  while((dire = readdir(dirp)) != NULL)
+  while ((dire = readdir(dirp)) != NULL)
   {
     // If the child name starts with a dot, it should not be read
-    if(dire->d_name[0] == '.') continue;
+    if (dire->d_name[0] == '.') continue;
 
     file_amount += dir_child_files_get(files, count, dirpath, dire->d_type, dire->d_name, depth);
   }
@@ -607,20 +644,21 @@ static inline int dir_files_get(char*** files, size_t* count, const char* dirpat
  * Determine the type of path, either dir or file
  *
  * PARAMS
- * - const char* path | Path to either file or dir
+ * - const char* path | Path to some kind of file or dir
  *
  * RETURN (int type)
- * - 0 | Path doesn't exist
- * - 1 | File
- * - 2 | Directory
+ * - TYPE_NONE | Path doesn't exist
+ * - TYPE_FILE | File
+ * - TYPE_DIR  | Directory
+ * - TYPE_ELSE | Something else
  */
 static inline int path_type_get(const char* path)
 {
   struct stat pstat;
 
-  if(stat(path, &pstat) == -1) return TYPE_NONE;
+  if (stat(path, &pstat) == -1) return TYPE_NONE;
 
-  switch(pstat.st_mode & S_IFMT)
+  switch (pstat.st_mode & S_IFMT)
   {
     case S_IFREG: return TYPE_FILE;
 
@@ -643,36 +681,31 @@ static inline int path_type_get(const char* path)
  * - int         depth | Search depth limit
  *
  * RETURN (int status)
- * - 
+ * -  0 | Bad input, or path is neither file or dir
+ * - >0 | Number of files
  */
 int files_get(char*** files, size_t* count, const char* path, int depth)
 {
-  if(!files || !count || !path) return 0;
+  if (!files || !count || !path) return 0;
 
-  int path_type = path_type_get(path);
-
-  // 1. If the path points to a file, or is blank
-  if(path_type == TYPE_FILE)
+  switch (path_type_get(path))
   {
-    *files = realloc(*files, sizeof(char*) * (*count + 1));
+    case TYPE_FILE:
+      *files = realloc(*files, sizeof(char*) * (*count + 1));
 
-    (*files)[(*count)++] = strdup(path);
+      (*files)[(*count)++] = strdup(path);
 
-    return 1;
+      return 1;
+
+    case TYPE_DIR:
+      return dir_files_get(files, count, path, depth);
+
+    default: return 0;
   }
-  else if(path_type == TYPE_DIR)
-  {
-    return dir_files_get(files, count, path, depth);
-  }
-  else if(path_type == TYPE_NONE)
-  {
-    return 0;
-  }
-  else return 0;
 }
 
 /*
- * Get the combined size of data of the inputted files
+ * Get the combined size of the files
  *
  * PARAMS
  * - char** files | Filepaths
@@ -682,11 +715,11 @@ int files_get(char*** files, size_t* count, const char* path, int depth)
  */
 size_t files_size_get(char** files, size_t count)
 {
-  if(!files) return 0;
+  if (!files) return 0;
 
   size_t size = 0;
 
-  for(size_t index = 0; index < count; index++)
+  for (size_t index = 0; index < count; index++)
   {
     size += file_size_get(files[index]);
   }
@@ -696,8 +729,6 @@ size_t files_size_get(char** files, size_t count)
 
 /*
  * Read and concatonate multiple files into single memory at pointer
- *
- * The function returns the total number of read bytes
  *
  * If the total read data would overwrite the buffer,
  * only read the amount of data that the buffer can hold
@@ -709,29 +740,29 @@ size_t files_size_get(char** files, size_t count)
  * - size_t count   | Number of files
  *
  * RETURN (size_t read_size)
+ * - 0  | Bad input, or files are empty
+ * - >0 | Number of total read bytes
  */
 size_t files_read(void* pointer, size_t size, char** files, size_t count)
 {
-  if(!pointer || !files) return 0;
+  if (!pointer || !files) return 0;
 
   size_t read_size = 0;
 
-  for(size_t index = 0; index < count; index++)
+  for (size_t index = 0; index < count; index++)
   {
     size_t file_size = file_size_get(files[index]);
 
     // If the current file would fill up the buffer,
     // read the last available bytes and return
-    if(read_size + file_size > size)
+    if (read_size + file_size > size)
     {
       read_size += file_read(pointer + read_size, size - read_size, files[index]);
       
       break;
     }
-    else
-    {
-      read_size += file_read(pointer + read_size, file_size, files[index]);
-    }
+
+    read_size += file_read(pointer + read_size, file_size, files[index]);
   }
 
   return read_size;
@@ -746,11 +777,13 @@ size_t files_read(void* pointer, size_t size, char** files, size_t count)
  */
 void files_free(char** files, size_t count)
 {
-  if(!files) return;
+  if (!files) return;
 
-  for(size_t index = 0; index < count; index++)
+  for (size_t index = 0; index < count; index++)
   {
-    if(files[index]) free(files[index]);
+    char* file = files[index];
+
+    if (file) free(file);
   }
 
   free(files);
