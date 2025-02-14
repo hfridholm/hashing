@@ -3,8 +3,11 @@
  *
  * Written by Hampus Fridholm
  *
- * Last updated: 2024-09-13
+ * Last updated: 2025-02-14
  */
+
+#define FILE_IMPLEMENT
+#include "file.h"
 
 #define SHA256_IMPLEMENT
 #include "sha256.h"
@@ -12,7 +15,11 @@
 #define MD5_IMPLEMENT
 #include "md5.h"
 
-#include "hashing.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <argp.h>
 
 static char doc[] = "hashing - compute hash algorithm checksum";
 
@@ -20,9 +27,9 @@ static char args_doc[] = "[FILE...]";
 
 static struct argp_option options[] =
 {
-  { "algorithm", 'a', "STRING", 0, "Hash algorithm to use" },
-  { "depth",     'd', "COUNT",  0, "Search depth limit" },
-  { "concat",    'c', 0,        0, "Concatonate file hashes" },
+  { "algorithm", 'a', "ALGORITHM", 0, "Hash algorithm to use" },
+  { "depth",     'd', "DEPTH",     0, "Directory depth limit" },
+  { "concat",    'c', 0,           0, "Concatonate files"     },
   { 0 }
 };
 
@@ -51,7 +58,7 @@ static error_t opt_parse(int key, char* arg, struct argp_state* state)
 {
   struct args* args = state->input;
 
-  switch(key)
+  switch (key)
   {
     case 'c':
       args->concat = true;
@@ -60,10 +67,9 @@ static error_t opt_parse(int key, char* arg, struct argp_state* state)
     case 'd':
       int depth = atoi(arg);
 
-      if(depth == 0 || depth < -1) argp_usage(state);
+      if (depth == 0 || depth < -1) argp_usage(state);
 
       else args->depth = depth;
-
       break;
 
     case 'a':
@@ -73,7 +79,7 @@ static error_t opt_parse(int key, char* arg, struct argp_state* state)
     case ARGP_KEY_ARG:
       args->args = realloc(args->args, sizeof(char*) * (state->arg_num + 1));
 
-      if(!args->args) return ENOMEM;
+      if (!args->args) return ENOMEM;
 
       args->args[state->arg_num] = arg;
 
@@ -100,15 +106,15 @@ static error_t opt_parse(int key, char* arg, struct argp_state* state)
  */
 static int message_hash_create(char* hash, const void* message, size_t size)
 {
-  if(!args.alg) return 0;
+  if (!args.alg) return 0;
 
-  if(strcmp(args.alg, "sha256") == 0)
+  if (strcmp(args.alg, "sha256") == 0)
   {
     sha256(hash, message, size);
 
     return 1;
   }
-  else if(strcmp(args.alg, "md5") == 0)
+  else if (strcmp(args.alg, "md5") == 0)
   {
     md5(hash, message, size);
 
@@ -118,41 +124,42 @@ static int message_hash_create(char* hash, const void* message, size_t size)
 }
 
 /*
- * Create a concatonated hash from files and print it
+ * Create a concatonated hash from files
  *
  * PARAMS
- * - char** files | Files to create hash from
+ * - char*  hash  | Pointer to hash memory
+ * - char** files | Paths to files
  * - size_t count | Number of files
+ *
+ * RETURN (same as message_hash_create)
  */
-static void files_concat_hash_print(char** files, size_t count)
+static int files_hash_create(char* hash, char** files, size_t count)
 {
   size_t files_size = files_size_get(files, count);
 
   char* message = malloc(sizeof(char) * files_size);
 
-  if(!message)
+  if (!message)
   {
-    printf("Files are to large\n");
+    printf("Files are too large\n");
 
-    return;
+    return 0;
   }
-
 
   size_t read_size = files_read(message, files_size, files, count);
 
-  char hash[64 + 1];
-  memset(hash, '\0', sizeof(hash));
-
-  message_hash_create(hash, message, read_size);
+  int status = message_hash_create(hash, message, read_size);
 
   free(message);
 
-  printf("%s\n", hash);
+  return status;
 }
 
 /*
+ * Create hash from file
+ *
  * PARAMS
- * - char*       hash     | Pointer to memory to store hash at
+ * - char*       hash     | Pointer to hash memory
  * - const char* filepath | Path to file
  *
  * RETURN (same as message_hash_create)
@@ -163,9 +170,9 @@ static int file_hash_create(char* hash, const char* filepath)
 
   char* message = malloc(sizeof(char) * file_size);
 
-  if(!message)
+  if (!message)
   {
-    printf("Files are to large\n");
+    printf("Files are too large\n");
 
     return 0;
   }
@@ -180,8 +187,61 @@ static int file_hash_create(char* hash, const char* filepath)
 }
 
 /*
+ * Create a concatonated hash from files, and print it
+ */
+static int files_hash_print(char** files, size_t count)
+{
+  char hash[64 + 1];
+  memset(hash, '\0', sizeof(hash));
+
+  if (files_hash_create(hash, files, count) == 0)
+  {
+    printf("hashing: Failed to create files hash");
+    return 1;
+  }
+
+  printf("%s\n", hash);
+
+  return 0;
+}
+
+/*
+ * Create hash from file, and print it
+ */
+static int file_hash_print(const char* file)
+{
+  char hash[64 + 1];
+  memset(hash, '\0', sizeof(hash));
+
+  if (file_hash_create(hash, file) == 0)
+  {
+    printf("hashing: Failed to create file hash\n");
+    return 1;
+  }
+
+  printf("%s  %s\n", hash, file);
+
+  return 0;
+}
+
+/*
+ * Create seperate hashes from files, and print them
+ */
+static void file_hashes_print(char** files, size_t count)
+{
+  for (size_t index = 0; index < count; index++)
+  {
+    char* file = files[index];
+
+    file_hash_print(file);
+  }
+}
+
+/*
+ * Input message from stdin
+ *
  * PARAMS
- * - char*  message | Pointer to memory to store message at
+ * - char*  message | Pointer to message memory
  * - size_t size    | Max size of message
  *
  * RETURN (size_t length)
@@ -190,13 +250,13 @@ static size_t message_input(char* message, size_t size)
 {
   size_t length;
 
-  for(length = 0; length < size; length++)
+  for (length = 0; length < size; length++)
   {
     char symbol = fgetc(stdin);
 
     message[length] = symbol;
 
-    if(symbol == EOF || symbol == '\0') break;
+    if (symbol == EOF || symbol == '\0') break;
   }
 
   return length;
@@ -204,7 +264,7 @@ static size_t message_input(char* message, size_t size)
 
 /*
  * PARAMS
- * - char* hash | Pointer to memory to store hash at
+ * - char* hash | Pointer to hash memory
  *
  * RETURN (same as message_hash_create)
  */
@@ -218,27 +278,22 @@ static int stdin_hash_create(char* hash)
 }
 
 /*
- * Create hashes from files and print them
- *
- * PARAMS
- * - char** files | Files to create hash from
- * - size_t count | Number of files
+ * Create hash from stdin message, and print it
  */
-static void files_separate_hash_print(char** files, size_t count)
+static int stdin_hash_print(void)
 {
   char hash[64 + 1];
   memset(hash, '\0', sizeof(hash));
 
-  for(size_t index = 0; index < count; index++)
+  if (stdin_hash_create(hash) == 0)
   {
-    if(strcmp(files[index], "-") != 0)
-    {
-      file_hash_create(hash, files[index]);
-    }
-    else stdin_hash_create(hash);
-
-    printf("%s  %s\n", hash, files[index]);
+    printf("hashing: Failed to create stdin hash\n");
+    return 1;
   }
+
+  printf("%s  -\n", hash);
+
+  return 0;
 }
 
 static struct argp argp = { options, opt_parse, args_doc, doc };
@@ -250,29 +305,58 @@ int main(int argc, char* argv[])
 {
   argp_parse(&argp, argc, argv, 0, 0, &args);
 
-  size_t count = 0;
-  char** files = files_create(&count, args.args, args.arg_count, args.depth);
-
-  // If no files was supplied, a symbol for no-file is added
-  if(args.arg_count == 0 && count == 0)
+  // If no paths was supplied, input from stdin
+  if (args.arg_count == 0)
   {
-    files = malloc(sizeof(char*));
-
-    files[count++] = strdup("-");
+    stdin_hash_print();
   }
-
-  if(args.concat)
+  else if (args.concat)
   {
-    files_concat_hash_print(files, count);
+    char** files = NULL;
+    size_t count = 0;
+
+    for (size_t index = 0; index < args.arg_count; index++)
+    {
+      char* path = args.args[index];
+
+      if (files_get(&files, &count, path, args.depth) == 0)
+      {
+        printf("hashing: %s: No file or directory\n", path);
+      }
+    }
+
+    files_hash_print(files, count);
+
+    files_free(files, count);
   }
   else
   {
-    files_separate_hash_print(files, count);
+    for (size_t index = 0; index < args.arg_count; index++)
+    {
+      char* path = args.args[index];
+
+      if (strcmp(path, "-") == 0)
+      {
+        stdin_hash_print();
+        continue;
+      }
+
+      char** files = NULL;
+      size_t count = 0;
+
+      if (files_get(&files, &count, path, args.depth) == 0)
+      {
+        printf("hashing: %s: No file or directory\n", path);
+        continue;
+      }
+
+      file_hashes_print(files, count);
+
+      files_free(files, count);
+    }
   }
 
-  files_free(files, count);
-
-  if(args.args) free(args.args);
+  if (args.args) free(args.args);
 
   return 0;
 }
