@@ -1,10 +1,3 @@
-PROGRAM := hashing
-
-CLEAN_TARGET := clean
-HELP_TARGET  := help
-
-DELETE_CMD := rm
-
 COMPILER := gcc
 COMPILE_FLAGS := -Wall -Werror -g -O0 -std=gnu99 -oFast
 
@@ -17,18 +10,15 @@ HEADER_FILES := $(wildcard $(SOURCE_DIR)/*.h)
 
 OBJECT_FILES := $(addprefix $(OBJECT_DIR)/, $(notdir $(SOURCE_FILES:.c=.o)))
 
-all: $(PROGRAM)
+default: hashing
 
-$(PROGRAM): $(OBJECT_FILES) $(SOURCE_FILES) $(HEADER_FILES)
-	$(COMPILER) $(OBJECT_FILES) -o $(BINARY_DIR)/$(PROGRAM)
+hashing: $(OBJECT_FILES) $(SOURCE_FILES) $(HEADER_FILES)
+	$(COMPILER) $(OBJECT_FILES) -o $(BINARY_DIR)/hashing
 
 $(OBJECT_DIR)/%.o: $(SOURCE_DIR)/%.c
 	$(COMPILER) $< -c $(COMPILE_FLAGS) -o $@
 
-.PRECIOUS: $(OBJECT_DIR)/%.o $(PROGRAM)
+.PRECIOUS: $(OBJECT_DIR)/%.o hashing
 
-$(CLEAN_TARGET):
-	$(DELETE_CMD) $(OBJECT_DIR)/*.o $(PROGRAM)
-
-$(HELP_TARGET):
-	@echo $(PROGRAM) $(CLEAN_TARGET)
+clean:
+	-rm 2>/dev/null $(OBJECT_DIR)/*.o hashing
