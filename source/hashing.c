@@ -35,20 +35,20 @@ static struct argp_option options[] =
 
 struct args
 {
-  char** args;
-  size_t arg_count;
-  char*  alg;
+  char** paths;
+  size_t path_count;
+  char*  algorithm;
   int    depth;
   bool   concat;
 };
 
 struct args args =
 {
-  .args      = NULL,
-  .arg_count = 0,
-  .alg       = "sha256",
-  .depth     = 1,
-  .concat    = false
+  .paths      = NULL,
+  .path_count = 0,
+  .algorithm  = "sha256",
+  .depth      = 1,
+  .concat     = false
 };
 
 /*
@@ -73,17 +73,17 @@ static error_t opt_parse(int key, char* arg, struct argp_state* state)
       break;
 
     case 'a':
-      args->alg = arg;
+      args->algorithm = arg;
       break;
 
     case ARGP_KEY_ARG:
-      args->args = realloc(args->args, sizeof(char*) * (state->arg_num + 1));
+      args->paths = realloc(args->paths, sizeof(char*) * (state->arg_num + 1));
 
-      if (!args->args) return ENOMEM;
+      if (!args->paths) return ENOMEM;
 
-      args->args[state->arg_num] = arg;
+      args->paths[state->arg_num] = arg;
 
-      args->arg_count = state->arg_num + 1;
+      args->path_count = state->arg_num + 1;
       break;
 
     case ARGP_KEY_END:
@@ -106,15 +106,15 @@ static error_t opt_parse(int key, char* arg, struct argp_state* state)
  */
 static int message_hash_create(char* hash, const void* message, size_t size)
 {
-  if (!args.alg) return 0;
+  if (!args.algorithm) return 0;
 
-  if (strcmp(args.alg, "sha256") == 0)
+  if (strcmp(args.algorithm, "sha256") == 0)
   {
     sha256(hash, message, size);
 
     return 1;
   }
-  else if (strcmp(args.alg, "md5") == 0)
+  else if (strcmp(args.algorithm, "md5") == 0)
   {
     md5(hash, message, size);
 
@@ -306,7 +306,7 @@ int main(int argc, char* argv[])
   argp_parse(&argp, argc, argv, 0, 0, &args);
 
   // If no paths was supplied, input from stdin
-  if (args.arg_count == 0)
+  if (args.path_count == 0)
   {
     stdin_hash_print();
   }
@@ -315,9 +315,9 @@ int main(int argc, char* argv[])
     char** files = NULL;
     size_t count = 0;
 
-    for (size_t index = 0; index < args.arg_count; index++)
+    for (size_t index = 0; index < args.path_count; index++)
     {
-      char* path = args.args[index];
+      char* path = args.paths[index];
 
       if (files_get(&files, &count, path, args.depth) == 0)
       {
@@ -331,9 +331,9 @@ int main(int argc, char* argv[])
   }
   else
   {
-    for (size_t index = 0; index < args.arg_count; index++)
+    for (size_t index = 0; index < args.path_count; index++)
     {
-      char* path = args.args[index];
+      char* path = args.paths[index];
 
       if (strcmp(path, "-") == 0)
       {
@@ -356,7 +356,7 @@ int main(int argc, char* argv[])
     }
   }
 
-  if (args.args) free(args.args);
+  if (args.paths) free(args.paths);
 
   return 0;
 }
