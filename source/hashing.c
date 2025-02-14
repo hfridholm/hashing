@@ -141,7 +141,7 @@ static int files_hash_create(char* hash, char** files, size_t count)
 
   if (!message)
   {
-    printf("Files are too large\n");
+    printf("hashing: Files are too large\n");
 
     return 0;
   }
@@ -172,7 +172,7 @@ static int file_hash_create(char* hash, const char* filepath)
 
   if (!message)
   {
-    printf("Files are too large\n");
+    printf("hashing: Files are too large\n");
 
     return 0;
   }
@@ -200,6 +200,8 @@ static int files_hash_print(char** files, size_t count)
     return 1;
   }
 
+  fflush(stdout);
+
   printf("%s\n", hash);
 
   return 0;
@@ -218,6 +220,8 @@ static int file_hash_print(const char* file)
     printf("hashing: Failed to create file hash\n");
     return 1;
   }
+
+  fflush(stdout);
 
   printf("%s  %s\n", hash, file);
 
@@ -291,6 +295,8 @@ static int stdin_hash_print(void)
     return 1;
   }
 
+  fflush(stdout);
+
   printf("%s  -\n", hash);
 
   return 0;
@@ -304,6 +310,8 @@ static struct argp argp = { options, opt_parse, args_doc, doc };
 int main(int argc, char* argv[])
 {
   argp_parse(&argp, argc, argv, 0, 0, &args);
+
+  fflush(stdout);
 
   // If no paths was supplied, input from stdin
   if (args.path_count == 0)
