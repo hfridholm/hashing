@@ -9,8 +9,6 @@
  * In main compilation unit; define FILE_IMPLEMENT
  *
  *
- * FUNCTIONS:
- *
  * char*  path_clean(char* path)
  *
  *
@@ -247,7 +245,7 @@ int dir_file_names_get(char*** names, size_t* count, const char* dirpath)
       continue;
     }
 
-    char** new_names = realloc(*names, sizeof(char*) * ((*count) + 1));
+    char** new_names = realloc(*names, sizeof(char*) * (*count + 1));
 
     if (!new_names)
     {
@@ -255,11 +253,10 @@ int dir_file_names_get(char*** names, size_t* count, const char* dirpath)
 
       return 1;
     }
-    else *names = new_names;
 
-    (*names)[(*count)] = strdup(dire->d_name);
+    *names = new_names;
 
-    (*count)++;
+    (*names)[(*count)++] = strdup(dire->d_name);
   }
 
   closedir(dirp);
@@ -548,7 +545,9 @@ char* path_clean(char* path)
  */
 static inline char* full_path_create(const char* dirpath, const char* child_name)
 {
-  char* fullpath = malloc(sizeof(char) * (strlen(dirpath) + strlen(child_name) + 2));
+  size_t size = strlen(dirpath) + strlen(child_name) + 2;
+
+  char* fullpath = malloc(sizeof(char) * size);
 
   sprintf(fullpath, "%s/%s", dirpath, child_name);
 
@@ -577,7 +576,11 @@ static inline int dir_child_files_get(char*** files, size_t* count, const char* 
   switch (child_type)
   {
     case DT_REG:
-      *files = realloc(*files, sizeof(char*) * (*count + 1));
+      char** new_files = realloc(*files, sizeof(char*) * (*count + 1));
+
+      if (!new_files) return 0;
+
+      *files = new_files;
 
       (*files)[(*count)++] = full_path_create(dirpath, child_name);
 
@@ -691,7 +694,11 @@ int files_get(char*** files, size_t* count, const char* path, int depth)
   switch (path_type_get(path))
   {
     case TYPE_FILE:
-      *files = realloc(*files, sizeof(char*) * (*count + 1));
+      char** new_files = realloc(*files, sizeof(char*) * (*count + 1));
+
+      if (!new_files) return 0;
+
+      *files = new_files;
 
       (*files)[(*count)++] = strdup(path);
 
